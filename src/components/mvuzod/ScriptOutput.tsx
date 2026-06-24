@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /**
  * ScriptOutput — Multi-panel output view for all generated MVUZOD artifacts
  * Displays: Schema Script, InitVar YAML, Variable List, Update Rules, Output Format, Regex

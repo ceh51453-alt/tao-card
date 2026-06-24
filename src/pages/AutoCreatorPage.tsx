@@ -33,6 +33,7 @@ export function AutoCreatorPage() {
   
   const [expandedStep, setExpandedStep] = useState<AnyPipelineStep | null>(null);
   const [showPromptOverride, setShowPromptOverride] = useState<AutoCreatorStep | null>(null);
+  const [showMnPromptOverride, setShowMnPromptOverride] = useState<MinhNguyetStep | null>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -254,6 +255,68 @@ export function AutoCreatorPage() {
     );
   };
 
+  const renderMnStepConfig = (step: MinhNguyetStep) => {
+    const meta = MINH_NGUYET_STEP_LABELS[step];
+    if (!meta) return null;
+    const isExpanded = expandedStep === step;
+    const isSelected = store.config.selectedMnSteps.includes(step);
+    const { mnStepConfigs } = store.config;
+    const isPromptOverrideOpen = showMnPromptOverride === step;
+    const currentConfig = mnStepConfigs[step] as unknown as Record<string, unknown>;
+    const isOptional = ['three_faces', 'nsfw_palette', 'npc_creation'].includes(step);
+
+    return (
+      <div key={step} className={cn("border rounded-xl transition-all overflow-hidden", isSelected ? "border-violet-500/30 bg-violet-500/5" : "border-border bg-card opacity-60")}>
+        <div className="flex items-center px-3 py-2 cursor-pointer" onClick={() => store.toggleMnStep(step)}>
+          <input type="checkbox" className="w-4 h-4 rounded border-border text-violet-500 cursor-pointer mr-3" checked={isSelected} onChange={() => store.toggleMnStep(step)} onClick={(e) => e.stopPropagation()} disabled={store.isRunning} />
+          <div className="flex-1 flex items-center gap-2">
+            <span className="text-sm">{meta.icon}</span>
+            <div>
+              <div className="text-sm font-medium">
+                {meta.label}
+                {isOptional && <span className="ml-1 text-[10px] text-muted-foreground font-normal">(tùy chọn)</span>}
+              </div>
+              <div className="text-[10px] text-muted-foreground">{meta.desc}</div>
+            </div>
+          </div>
+          <button className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 transition-colors" onClick={(e) => { e.stopPropagation(); setExpandedStep(isExpanded ? null : step); }}>
+            {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          </button>
+        </div>
+
+        {isExpanded && (
+          <div className="px-10 py-3 border-t border-border/50 bg-background/50 text-xs space-y-3">
+            {step === 'npc_creation' && (
+              <SliderControl label="Số lượng NPC" value={currentConfig.npcCount as number} min={1} max={10} onChange={(v) => store.updateMnStepConfig('npc_creation', { npcCount: v })} disabled={store.isRunning} />
+            )}
+            
+            {step === 'opening' && (
+              <SliderControl label="Alternate Greetings" value={currentConfig.alternateGreetings as number} min={0} max={5} onChange={(v) => store.updateMnStepConfig('opening', { alternateGreetings: v })} disabled={store.isRunning} />
+            )}
+
+            <div className="pt-2 border-t border-border/30">
+              <button className="text-[10px] text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors" onClick={() => setShowMnPromptOverride(isPromptOverrideOpen ? null : step)}>
+                <Edit3 className="w-3 h-3" /> {isPromptOverrideOpen ? 'Ẩn' : 'Custom Prompt'}
+              </button>
+              {isPromptOverrideOpen && (
+                <div className="mt-2 space-y-2">
+                  <select className="border rounded px-2 py-1 bg-background text-[10px] w-full" value={(currentConfig.promptMode as string) || 'default'} onChange={(e) => store.updateMnStepConfig(step, { promptMode: e.target.value } as never)} disabled={store.isRunning}>
+                    <option value="default">Mặc định</option>
+                    <option value="append">Nối thêm vào prompt</option>
+                    <option value="replace">Thay thế hoàn toàn</option>
+                  </select>
+                  {(currentConfig.promptMode as string) !== 'default' && (
+                    <textarea className="w-full h-20 p-2 text-[10px] rounded border border-border bg-card resize-none focus:outline-none focus:ring-1 focus:ring-primary/50" placeholder="Nhập prompt tùy chỉnh..." value={(currentConfig.promptOverride as string) || ''} onChange={(e) => store.updateMnStepConfig(step, { promptOverride: e.target.value } as never)} disabled={store.isRunning} />
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="h-full flex flex-col md:flex-row overflow-hidden bg-background">
       {/* ─── CỘT TRÁI ─── */}
@@ -335,27 +398,7 @@ export function AutoCreatorPage() {
               <div className="space-y-2">
                 <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">🌙 CÁC BƯỚC MINH NGUYỆT</label>
                 <div className="space-y-1.5">
-                  {Object.entries(MINH_NGUYET_STEP_LABELS).map(([stepId, meta]) => {
-                    const step = stepId as MinhNguyetStep;
-                    const isSelected = store.config.selectedMnSteps.includes(step);
-                    const isOptional = ['three_faces', 'nsfw_palette', 'npc_creation'].includes(step);
-                    return (
-                      <div key={step} className={cn(
-                        'flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all text-xs',
-                        isSelected ? 'border-violet-500/30 bg-violet-500/5' : 'border-border bg-card opacity-60 hover:opacity-100'
-                      )} onClick={() => !store.isRunning && store.toggleMnStep(step)}>
-                        <span className="text-sm">{meta.icon}</span>
-                        <div className="flex-1">
-                          <span className="font-medium">{meta.label}</span>
-                          {isOptional && <span className="ml-1 text-[10px] text-muted-foreground">(tùy chọn)</span>}
-                          <div className="text-[10px] text-muted-foreground">{meta.desc}</div>
-                        </div>
-                        <div className={cn('w-4 h-4 rounded-sm border flex items-center justify-center', isSelected ? 'bg-violet-500 border-violet-500' : 'border-muted-foreground/30')}>
-                          {isSelected && <Check className="w-3 h-3 text-white" />}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {Object.keys(MINH_NGUYET_STEP_LABELS).map(stepId => renderMnStepConfig(stepId as MinhNguyetStep))}
                 </div>
               </div>
             </>

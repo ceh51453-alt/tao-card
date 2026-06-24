@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /**
  * GameFrontendPreview — Enhanced Game Frontend Preview Component
  * Previews game UI components (Status Bar, Opening Form, Game Screen)
@@ -189,13 +188,13 @@ function EnhancedStatusBarPreview({ schema, mockState }: { schema: MVUZODSchema;
 
           if (field.type === 'object' && field.children?.length) {
             return field.children
-              .filter(c => c.type === 'number' && !c.constraints.hidden)
+              .filter(c => c.type === 'number' && !c.constraints?.hidden)
               .slice(0, 3)
               .map(child => {
                 const childName = getFieldName(child);
                 const childValue = (value as Record<string, unknown>)?.[childName];
                 const numVal = Number(childValue ?? 0);
-                const max = child.constraints.clamp?.[1] ?? child.constraints.max ?? 100;
+                const max = child.constraints?.clamp?.[1] ?? child.constraints?.max ?? 100;
                 const pct = Math.min(100, (numVal / max) * 100);
 
                 return (
@@ -229,7 +228,7 @@ function EnhancedStatusBarPreview({ schema, mockState }: { schema: MVUZODSchema;
                 {field.label}
               </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-                {field.children.filter(c => !c.constraints.hidden).map(child => {
+                {field.children.filter(c => !c.constraints?.hidden).map(child => {
                   const childName = getFieldName(child);
                   const childValue = (value as Record<string, unknown>)[childName];
                   return (
@@ -273,7 +272,7 @@ function EnhancedOpeningFormPreview({ schema }: { schema: MVUZODSchema }) {
     function collect(fields: MVUZODField[]) {
       for (const f of fields) {
         if (f.children?.length) collect(f.children);
-        else if (!f.constraints.readOnly && !f.constraints.hidden) result.push(f);
+        else if (!f.constraints?.readOnly && !f.constraints?.hidden) result.push(f);
       }
     }
     collect(schema.fields);
@@ -308,9 +307,9 @@ function EnhancedOpeningFormPreview({ schema }: { schema: MVUZODSchema }) {
                   defaultValue={Number(field.defaultValue ?? 0)}
                   className="flex-1 px-3 py-2 text-xs rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
                 />
-                {field.constraints.clamp && (
+                {field.constraints?.clamp && (
                   <span className="text-[9px] text-muted-foreground whitespace-nowrap">
-                    ({field.constraints.clamp[0]}~{field.constraints.clamp[1]})
+                    ({field.constraints?.clamp[0]}~{field.constraints?.clamp[1]})
                   </span>
                 )}
               </div>
@@ -323,9 +322,9 @@ function EnhancedOpeningFormPreview({ schema }: { schema: MVUZODSchema }) {
                   Không
                 </button>
               </div>
-            ) : field.constraints.enumValues?.length ? (
+            ) : field.constraints?.enumValues?.length ? (
               <select className="w-full px-3 py-2 text-xs rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/20">
-                {field.constraints.enumValues.map(v => (
+                {field.constraints?.enumValues.map(v => (
                   <option key={v} value={v}>{v}</option>
                 ))}
               </select>
@@ -425,7 +424,7 @@ function generateComponentCode(component: PreviewComponent, schema: MVUZODSchema
 
 function generateStatusBarCode(schema: MVUZODSchema): string {
   const varReads = schema.fields
-    .filter(f => !f.constraints.hidden)
+    .filter(f => !f.constraints?.hidden)
     .map(f => {
       const name = getFieldName(f);
       return `const ${toVarName(name)} = Mvu.getMvuData({ type: 'message', message_id: 'latest' }).stat_data?.${name};`;
@@ -433,7 +432,7 @@ function generateStatusBarCode(schema: MVUZODSchema): string {
     .join('\n');
 
   const barItems = schema.fields
-    .filter(f => !f.constraints.hidden)
+    .filter(f => !f.constraints?.hidden)
     .map(f => {
       const name = getFieldName(f);
       const varName = toVarName(name);
@@ -474,7 +473,7 @@ function generateOpeningFormCode(schema: MVUZODSchema): string {
   function collect(ff: MVUZODField[]) {
     for (const f of ff) {
       if (f.children?.length) collect(f.children);
-      else if (!f.constraints.readOnly && !f.constraints.hidden) fields.push(f);
+      else if (!f.constraints?.readOnly && !f.constraints?.hidden) fields.push(f);
     }
   }
   collect(schema.fields);
@@ -587,7 +586,7 @@ const maintext = parseMaintext(latestMsg);
 const options = parseOptions(latestMsg);
 
 // Build status bar from variables
-const statusItems = ${JSON.stringify(schema.fields.filter(f => !f.constraints.hidden).map(f => ({ name: getFieldName(f), label: f.label })))};
+const statusItems = ${JSON.stringify(schema.fields.filter(f => !f.constraints?.hidden).map(f => ({ name: getFieldName(f), label: f.label })))};
 
 const statusHTML = statusItems
   .map(item => \`<span class="status-pill">\${item.label}: \${JSON.stringify(vars[item.name] ?? '-')}</span>\`)

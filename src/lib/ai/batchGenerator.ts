@@ -13,6 +13,7 @@ import { checkAntiSummarization } from '../completionVerifier/antiSummarization'
 import { buildCoherenceContext } from './coherenceManager';
 import type { EntryCategory, CardType } from '../worldbook/worldbookConfig';
 import { cascadeSearch } from './webScraper';
+import { getProfileExtractionContext } from './worldbuildingDefaults';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONFIG
@@ -253,7 +254,7 @@ export async function runBatchGeneration(config: BatchGenConfig, ctx: BatchRunCo
 
       const userMessage = buildBatchUserMessage(config, ctx.card, seen, ragCtx.injectionText, coherenceCtx, webInjection, countThisBatch, i, totalBatches);
       const messages: ChatMessage[] = [
-        { role: 'system', content: BATCH_SYSTEM_PROMPT },
+        { role: 'system', content: BATCH_SYSTEM_PROMPT + getProfileExtractionContext(profile) },
         { role: 'user', content: userMessage },
       ];
 

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { useState } from 'react';
 import { parseWikiUrl, fetchWikiNavigation, fetchFandomLocalNavigation, type WikiMenuItem, META_FILTERS, titleMatchesMeta, extractNavigationFromJsonInHtml, parseHtmlToMenuTree, fetchHtmlWithProxyRotation } from '../../lib/ai/wikiCrawlerEngine';
 import { Search, Loader2, Play, CheckSquare, Square, ChevronRight, ChevronDown, ListTree, Filter } from 'lucide-react';

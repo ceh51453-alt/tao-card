@@ -61,10 +61,14 @@ CẤU HÌNH:
 - Bao gồm Personality: ${config.includePersonality}
 - Bao gồm Scenario: ${config.includeScenario}
 
+QUY TẮC QUAN TRỌNG VỀ ĐỊNH DẠNG "DESCRIPTION":
+- Nếu ý tưởng yêu cầu tạo một Hệ thống (System), Game Master, Người Kể Chuyện (Narrator) hoặc môi trường Game/RPG: TUYỆT ĐỐI KHÔNG mô tả nó như một con người hay chatbot cá nhân (không ghi tên định danh cá nhân, ngoại hình, thực thể). Thay vào đó, mục "description" CHỈ TẬP TRUNG mô tả bối cảnh thế giới, văn phong, cơ chế game, giao diện và quy tắc vận hành.
+- Nếu là thẻ nhân vật bình thường: Viết mô tả chi tiết, khách quan ở ngôi thứ 3.
+
 Yêu cầu định dạng JSON chính xác:
 {
   "name": "Tên nhân vật (ngắn gọn)",
-  "description": "Mô tả chi tiết về nhân vật, ngoại hình, xuất thân... (ít nhất 200 từ, viết dạng database/YAML-like, ngôi 3, khách quan)",
+  "description": "Mô tả nhân vật (nếu là nhân vật) HOẶC mô tả hệ thống/cơ chế/bối cảnh (nếu là System/Game Master). Tuân thủ đúng Quy tắc quan trọng ở trên (ít nhất 200 từ, ngôi 3, khách quan)",
   "personality": "Mô tả tính cách (nếu được yêu cầu, ít nhất 100 từ)",
   "scenario": "Bối cảnh hiện tại (nếu được yêu cầu, ít nhất 50 từ)"
 }

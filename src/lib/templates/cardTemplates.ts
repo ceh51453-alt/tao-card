@@ -168,7 +168,7 @@ const romanceTemplate: CardTemplate = {
     // Link schema
     const schemaTemplate = MVUZOD_TEMPLATES.find(t => t.id === 'dating_sim');
     if (schemaTemplate) {
-      (base.data.extensions as any).mvuzod = { schema: schemaTemplate.schema };
+      (base.data.extensions as unknown as Record<string, unknown>).mvuzod = { schema: schemaTemplate.schema };
     }
 
     return base;
@@ -284,7 +284,7 @@ const adventureTemplate: CardTemplate = {
 
     const schemaTemplate = MVUZOD_TEMPLATES.find(t => t.id === 'rpg_basic');
     if (schemaTemplate) {
-      (base.data.extensions as any).mvuzod = { schema: schemaTemplate.schema };
+      (base.data.extensions as unknown as Record<string, unknown>).mvuzod = { schema: schemaTemplate.schema };
     }
 
     return base;
@@ -392,7 +392,7 @@ const systemTemplate: CardTemplate = {
 
     const schemaTemplate = MVUZOD_TEMPLATES.find(t => t.id === 'slice_of_life');
     if (schemaTemplate) {
-      (base.data.extensions as any).mvuzod = { schema: schemaTemplate.schema };
+      (base.data.extensions as unknown as Record<string, unknown>).mvuzod = { schema: schemaTemplate.schema };
     }
 
     return base;
@@ -482,8 +482,8 @@ export function applyCardTemplate(template: CardTemplate, existingCard: Characte
 
     // Extensions (schema etc.) — merge
     if (built.data.extensions) {
-      const ext = built.data.extensions as any;
-      const targetExt = clone.data.extensions as any;
+      const ext = built.data.extensions as unknown as Record<string, unknown>;
+      const targetExt = clone.data.extensions as unknown as Record<string, unknown>;
       for (const [key, value] of Object.entries(ext)) {
         if (key !== 'talkativeness' && key !== 'fav') {
           targetExt[key] = value;

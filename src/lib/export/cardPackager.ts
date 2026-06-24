@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /**
  * src/lib/export/cardPackager.ts — Complete Card Export Pipeline
  *
@@ -14,7 +13,7 @@
  */
 
 import type { CharacterCardV3 } from '../../types/card.types';
-import type { RegexScript } from '../../types/regex.types';
+import type { RegexScript, RegexPlacement } from '../../types/regex.types';
 import type { MVUZODSchema } from '../../types/mvuzod.types';
 import { syncMirrorFields } from '../converters/cardDefaults';
 import { exportCardV3 } from '../converters/lorebookConvert';
@@ -220,24 +219,24 @@ export async function packageCard(
     const newScripts = [...existingScripts];
 
     if (!scriptNames.has(mvuImport.name)) {
-      newScripts.push(mvuImport as any);
+      newScripts.push(mvuImport as unknown as typeof newScripts[number]);
       injections.push('Script: MVU Import script injected');
     }
 
     // Replace or add schema script
     const schemaIdx = newScripts.findIndex(s => s.name.startsWith('Cấu trúc biến'));
     if (schemaIdx >= 0) {
-      newScripts[schemaIdx] = schemaScript as any;
+      newScripts[schemaIdx] = schemaScript as unknown as typeof newScripts[number];
       injections.push('Script: Schema script updated');
     } else {
-      newScripts.push(schemaScript as any);
+      newScripts.push(schemaScript as unknown as typeof newScripts[number]);
       injections.push('Script: Schema script injected');
     }
 
     if (!exportCard.data.extensions.tavern_helper) {
       exportCard.data.extensions.tavern_helper = { scripts: [], variables: {} };
     }
-    exportCard.data.extensions.tavern_helper.scripts = newScripts as any;
+    exportCard.data.extensions.tavern_helper.scripts = newScripts;
   }
 
   // ─── Step 4: Sync Mirror Fields ───────────────────────────────────────
@@ -338,7 +337,7 @@ function mergeRegexPatterns(
         findRegex: gen.findRegex,
         replaceString: gen.replaceString,
         trimStrings: [],
-        placement: [gen.scope === 'ai_output' ? 1 : gen.scope === 'user_input' ? 0 : 1] as any,
+        placement: [gen.scope === 'ai_output' ? 1 : gen.scope === 'user_input' ? 0 : 1] as unknown as RegexPlacement[],
         disabled: false,
         markdownOnly: false,
         promptOnly: false,

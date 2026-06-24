@@ -59,7 +59,8 @@ QUY TẮC:
 - Phân loại entry đúng category và đặt suggestedPosition/suggestedConstant theo best practices SillyTavern
 - worldview entries: position=0, constant=true, order thấp
 - character entries: position=1, constant tùy thẻ đơn/nhiều
-- npc/location/event: position=1, constant=false (selective)`;
+- npc/location/event: position=1, constant=false (selective)
+- ĐỐI VỚI HỆ THỐNG/GAME MASTER/NARRATOR: Nếu ý tưởng là môi trường Game/RPG/Hệ thống, KHÔNG tạo characterProfile như một thực thể cá nhân (không ghi tên định danh, ngoại hình cá nhân). Phần characterProfile và thế giới quan (worldStructure) phải tập trung mô tả bối cảnh, cơ chế hoạt động, luật chơi và văn phong (narrative style).`;
 
 export async function analyzeIdea(
   idea: string,
@@ -79,14 +80,14 @@ export async function analyzeIdea(
   let parsed: CardBlueprint | null = null;
 
   // Try parse strategies
-  try { parsed = JSON.parse(trimmed) as CardBlueprint; } catch (e) { /* ignore */ }
+  try { parsed = JSON.parse(trimmed) as CardBlueprint; } catch { /* ignore */ }
   if (!parsed) {
     const fence = trimmed.match(/```(?:json)?\s*([\s\S]+?)```/);
-    if (fence) { try { parsed = JSON.parse(fence[1].trim()) as CardBlueprint; } catch (e) { /* ignore */ } }
+    if (fence) { try { parsed = JSON.parse(fence[1].trim()) as CardBlueprint; } catch { /* ignore */ } }
   }
   if (!parsed) {
     const objMatch = trimmed.match(/\{[\s\S]+\}/);
-    if (objMatch) { try { parsed = JSON.parse(objMatch[0]) as CardBlueprint; } catch (e) { /* ignore */ } }
+    if (objMatch) { try { parsed = JSON.parse(objMatch[0]) as CardBlueprint; } catch { /* ignore */ } }
   }
 
   if (!parsed) {

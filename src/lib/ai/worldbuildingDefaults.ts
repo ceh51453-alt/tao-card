@@ -1,4 +1,4 @@
-import type { WorldbuildingStep } from '../../types/settings.types';
+import type { WorldbuildingStep, ProxyProfile } from '../../types/settings.types';
 
 export const PIPELINE_VERSION = 3;
 
@@ -562,3 +562,24 @@ export const DEFAULT_STEPS: WorldbuildingStep[] = [
 </Timeline>`
   }
 ];
+
+export function getProfileExtractionContext(profile?: ProxyProfile): string {
+  if (!profile) return '';
+  const parts: string[] = [];
+  
+  if (profile.masterInstruction) {
+    parts.push(`### HƯỚNG DẪN TỔNG (MASTER INSTRUCTION)\n${profile.masterInstruction}`);
+  }
+  
+  if (profile.aiPipelineMemory) {
+    parts.push(`### GHI NHỚ VỀ HƯỚNG DẪN TỔNG:\n${profile.aiPipelineMemory}`);
+  }
+  
+  const steps = (profile.steps || DEFAULT_STEPS).filter(s => s.enabled);
+  if (steps.length > 0) {
+    const stepsText = steps.map((s, idx) => `BƯỚC ${idx + 1}: [${s.name}]\n- ${s.prompt}`).join('\n\n');
+    parts.push(`### QUY TRÌNH TRÍCH XUẤT (PIPELINE STEPS)\nBạn cần tuân thủ các quy tắc trong quy trình sau:\n${stepsText}`);
+  }
+  
+  return parts.length > 0 ? '\n\n' + parts.join('\n\n') : '';
+}

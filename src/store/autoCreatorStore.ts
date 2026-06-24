@@ -48,6 +48,10 @@ interface AutoCreatorState {
     patch: Partial<AutoCreatorConfig['stepConfigs'][K]>
   ) => void;
   updateMnConfig: (patch: Partial<AutoCreatorConfig['mnConfig']>) => void;
+  updateMnStepConfig: <K extends keyof AutoCreatorConfig['mnStepConfigs']>(
+    step: K,
+    patch: Partial<AutoCreatorConfig['mnStepConfigs'][K]>
+  ) => void;
   setAutoApplyAll: (v: boolean) => void;
   applyPreset: (presetConfig: Partial<AutoCreatorConfig>) => void;
   
@@ -141,10 +145,19 @@ export const useAutoCreatorStore = create<AutoCreatorState>((set) => ({
       includeThreeFaces: false,
       includeNsfw: false,
       includeNpc: false,
-      npcCount: 2,
-      alternateGreetings: 2,
       autoTag: true,
-      promptMode: 'default',
+    },
+    mnStepConfigs: {
+      worldview: { promptMode: 'default' },
+      character_basic: { promptMode: 'default' },
+      color_palette: { promptMode: 'default' },
+      three_faces: { promptMode: 'default' },
+      secondary_explanation: { promptMode: 'default' },
+      wardrobe: { promptMode: 'default' },
+      nsfw_palette: { promptMode: 'default' },
+      npc_creation: { npcCount: 2, promptMode: 'default' },
+      character_overview: { promptMode: 'default' },
+      opening: { alternateGreetings: 2, promptMode: 'default' },
     },
   },
 
@@ -211,6 +224,16 @@ export const useAutoCreatorStore = create<AutoCreatorState>((set) => ({
     }
   })),
 
+  updateMnStepConfig: (step, patch) => set((s) => ({
+    config: {
+      ...s.config,
+      mnStepConfigs: {
+        ...s.config.mnStepConfigs,
+        [step]: { ...s.config.mnStepConfigs[step], ...patch }
+      }
+    }
+  })),
+
   setAutoApplyAll: (autoApplyAll) => set((s) => ({ config: { ...s.config, autoApplyAll } })),
 
   applyPreset: (presetConfig) => set((s) => {
@@ -226,6 +249,12 @@ export const useAutoCreatorStore = create<AutoCreatorState>((set) => ({
     }
     if (presetConfig.mnConfig) {
       merged.mnConfig = { ...merged.mnConfig, ...presetConfig.mnConfig };
+    }
+    if (presetConfig.mnStepConfigs) {
+      merged.mnStepConfigs = {
+        ...merged.mnStepConfigs,
+        ...presetConfig.mnStepConfigs,
+      };
     }
     if (presetConfig.presetId !== undefined) merged.presetId = presetConfig.presetId;
     return { config: merged };

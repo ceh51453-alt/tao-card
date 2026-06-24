@@ -73,7 +73,7 @@ export function TemplateGallery({ open, onClose }: TemplateGalleryProps) {
   const handleApplySchema = useCallback((template: MVUZODTemplate) => {
     createSnapshot('Apply schema');
     const clone = structuredClone(card);
-    (clone.data.extensions as any).mvuzod = { schema: template.schema };
+    (clone.data.extensions as unknown as Record<string, unknown>).mvuzod = { schema: template.schema };
     setCard(clone);
     setApplied(template.id);
     setTimeout(() => setApplied(null), 2000);

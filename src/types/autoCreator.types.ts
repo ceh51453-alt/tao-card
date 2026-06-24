@@ -95,18 +95,41 @@ export interface MesExampleStepConfig {
   promptMode: PromptMode;
 }
 
-// ═══ Config Minh Nguyệt cho từng bước ═══
-export interface MinhNguyetStepConfig {
+// ═══ Config Minh Nguyệt Global ═══
+export interface MinhNguyetGlobalConfig {
   worldviewPath: WorldviewPath;    // Đường A/B/C
   cardType: CardType;              // Thẻ đơn/nhiều NV
   includeThreeFaces: boolean;      // Có ba diện tính không
   includeNsfw: boolean;            // Có bảng NSFW không
   includeNpc: boolean;             // Có NPC không
-  npcCount: number;                // Số NPC (1-10)
-  alternateGreetings: number;      // Số khai bạch thay thế (0-5)
   autoTag: boolean;                // Tự động gán tag <tên_idN>
+}
+
+// ═══ Config Minh Nguyệt cho từng bước ═══
+export interface MnBaseStepConfig {
   promptOverride?: string;
   promptMode: PromptMode;
+}
+
+export interface MnNpcStepConfig extends MnBaseStepConfig {
+  npcCount: number;
+}
+
+export interface MnOpeningStepConfig extends MnBaseStepConfig {
+  alternateGreetings: number;
+}
+
+export interface MnStepConfigs {
+  worldview: MnBaseStepConfig;
+  character_basic: MnBaseStepConfig;
+  color_palette: MnBaseStepConfig;
+  three_faces: MnBaseStepConfig;
+  secondary_explanation: MnBaseStepConfig;
+  wardrobe: MnBaseStepConfig;
+  nsfw_palette: MnBaseStepConfig;
+  npc_creation: MnNpcStepConfig;
+  character_overview: MnBaseStepConfig;
+  opening: MnOpeningStepConfig;
 }
 
 // ═══ Config tổng thể ═══
@@ -126,7 +149,8 @@ export interface AutoCreatorConfig {
     first_message: FirstMessageStepConfig;
     mes_example: MesExampleStepConfig;
   };
-  mnConfig: MinhNguyetStepConfig;        // Config chung cho Minh Nguyệt
+  mnConfig: MinhNguyetGlobalConfig;      // Config chung cho Minh Nguyệt
+  mnStepConfigs: MnStepConfigs;          // Config riêng cho từng bước Minh Nguyệt
 }
 
 // ═══ Step Preview (v3) ═══

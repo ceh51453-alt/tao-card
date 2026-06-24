@@ -28,7 +28,7 @@ function generateUpdateRulesYAML(schema: MVUZODSchema): string {
     const pad = '  '.repeat(indent);
 
     // Skip readonly fields (prefixed with _)
-    if (name.startsWith('_') || field.constraints.readOnly) return;
+    if (name.startsWith('_') || field.constraints?.readOnly) return;
 
     // If has children, recurse
     if (field.children?.length) {
@@ -43,7 +43,7 @@ function generateUpdateRulesYAML(schema: MVUZODSchema): string {
     lines.push(`${pad}${name}:`);
 
     // Type
-    if (field.constraints.updateType) {
+    if (field.constraints?.updateType) {
       lines.push(`${pad}  type: |-`);
       for (const line of field.constraints.updateType.split('\n')) {
         lines.push(`${pad}    ${line}`);
@@ -53,25 +53,25 @@ function generateUpdateRulesYAML(schema: MVUZODSchema): string {
     } else if (field.type === 'record') {
       lines.push(`${pad}  type: |-`);
       lines.push(`${pad}    {`);
-      const keyDesc = field.constraints.describe ?? 'key';
+      const keyDesc = field.constraints?.describe ?? 'key';
       lines.push(`${pad}      [${keyDesc}: string]: ${field.children?.length ? 'object' : 'string'}`);
       lines.push(`${pad}    }`);
     }
 
     // Range
-    if (field.constraints.updateRange) {
-      lines.push(`${pad}  range: ${field.constraints.updateRange}`);
-    } else if (field.constraints.clamp) {
-      lines.push(`${pad}  range: ${field.constraints.clamp[0]}~${field.constraints.clamp[1]}`);
+    if (field.constraints?.updateRange) {
+      lines.push(`${pad}  range: ${field.constraints?.updateRange}`);
+    } else if (field.constraints?.clamp) {
+      lines.push(`${pad}  range: ${field.constraints?.clamp[0]}~${field.constraints?.clamp[1]}`);
     }
 
     // Format
-    if (field.constraints.updateFormat) {
-      lines.push(`${pad}  format: ${field.constraints.updateFormat}`);
+    if (field.constraints?.updateFormat) {
+      lines.push(`${pad}  format: ${field.constraints?.updateFormat}`);
     }
 
     // Check rules
-    if (field.constraints.checkRules?.length) {
+    if (field.constraints?.checkRules?.length) {
       lines.push(`${pad}  check:`);
       for (const rule of field.constraints.checkRules) {
         lines.push(`${pad}    - ${rule}`);
@@ -98,7 +98,7 @@ function generateUpdateRulesYAML(schema: MVUZODSchema): string {
 function generateAutoCheck(field: MVUZODField, name: string): string[] {
   const checks: string[] = [];
 
-  if (field.type === 'number' && field.constraints.clamp) {
+  if (field.type === 'number' && field.constraints?.clamp) {
     const [min, max] = field.constraints.clamp;
     checks.push(`Phạm vi: ${min}~${max}`);
     checks.push(`Chỉ update khi có sự kiện liên quan trực tiếp`);
@@ -106,7 +106,7 @@ function generateAutoCheck(field: MVUZODField, name: string): string[] {
 
   if (field.type === 'record') {
     checks.push(`Thêm/xóa items khi có sự kiện liên quan`);
-    if (field.constraints.transform === 'pickBy') {
+    if (field.constraints?.transform === 'pickBy') {
       checks.push(`Số lượng = 0 → tự động xóa`);
     }
   }
@@ -394,6 +394,7 @@ function applyRulesToFields(
   for (const field of fields) {
     const ruleData = rules[field.path];
     if (ruleData) {
+      if (!field.constraints) field.constraints = {};
       if (ruleData.checkRules?.length) field.constraints.checkRules = ruleData.checkRules;
       if (ruleData.range) field.constraints.updateRange = ruleData.range;
       if (ruleData.format) field.constraints.updateFormat = ruleData.format;

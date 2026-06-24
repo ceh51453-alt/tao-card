@@ -34,7 +34,7 @@ export function UserGuideModal({ open, onClose }: UserGuideModalProps) {
     const items: HeadingItem[] = [];
     let inCode = false;
 
-    for (let line of lines) {
+    for (const line of lines) {
       const trimmed = line.trim();
       if (trimmed.startsWith('```')) {
         inCode = !inCode;
@@ -397,7 +397,7 @@ function parseMarkdown(md: string): string {
 
       const alertMatch = bqContent.match(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/i);
       if (alertMatch) {
-        bqType = alertMatch[1].toLowerCase() as any;
+        bqType = alertMatch[1].toLowerCase() as 'note' | 'tip' | 'important' | 'warning' | 'caution';
       } else {
         if (bqLines.length === 0) {
           bqType = 'normal';
@@ -409,7 +409,7 @@ function parseMarkdown(md: string): string {
       flushBlockquote();
     }
 
-    const listMatch = line.match(/^\s*[\-*+]\s*(.*)/);
+    const listMatch = line.match(/^\s*[-*+]\s*(.*)/);
     if (listMatch) {
       flushTable();
       if (!inList) {

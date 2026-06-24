@@ -12,6 +12,7 @@ import { useCardStore } from '../../store/cardStore';
 import { useAutoCreatorStore } from '../../store/autoCreatorStore';
 import { callAI } from './client';
 import { runBatchGeneration } from './batchGenerator';
+import { getProfileExtractionContext } from './worldbuildingDefaults';
 import { materializeEntry, nextEntryId } from '../converters/cardDefaults';
 import { analyzeIdea } from './autoCreatorAnalyzer';
 import {
@@ -210,10 +211,24 @@ async function executeStep(
   const freshCardStr = JSON.stringify(cardStore.card.data, null, 2);
 
   const callAIAndExtract = async (prompt: string): Promise<unknown> => {
+    let finalPrompt = prompt;
+    
+    // Inject global Master Instruction & Pipeline Steps
+    finalPrompt += getProfileExtractionContext(ctx.profile);
+
+    if (ctx.generationParams.max_tokens && ctx.generationParams.max_tokens >= 4000) {
+      finalPrompt += `\n\n[YÊU CẦU ĐỘ DÀI VÀ CHI TIẾT - QUAN TRỌNG]
+Người dùng đã cấp dung lượng output rất lớn (${ctx.generationParams.max_tokens} tokens). 
+BẠN PHẢI TẬN DỤNG TỐI ĐA dung lượng này để tạo ra nội dung CỰC KỲ CHI TIẾT, TOÀN DIỆN VÀ CHUYÊN SÂU.
+- Tuyệt đối không viết tóm tắt, cộc lốc hay dùng các câu ngắn gọn (trừ khi cố ý vì lý do nghệ thuật).
+- Mở rộng mọi khía cạnh có thể, cung cấp ví dụ chi tiết, đào sâu vào cơ chế, tâm lý, lịch sử hoặc bối cảnh.
+- Không bỏ lỡ bất cứ tiểu tiết nào quan trọng, không dùng các cụm từ "vân vân", "tương tự".`;
+    }
+
     const response = await callAI({
       profile: ctx.profile,
       params: ctx.generationParams,
-      messages: [{ role: 'user', content: prompt }]
+      messages: [{ role: 'user', content: finalPrompt }]
     });
     
     const parsed = extractJsonFromText(response.text);

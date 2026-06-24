@@ -92,14 +92,14 @@ function generateUpdateRulesEntry(
   schema: MVUZODSchema,
   charName: string,
 ): GeneratedVariableEntry {
-  const paths = flattenPaths(schema.fields).filter(f => !f.constraints.readOnly && !f.constraints.hidden);
+  const paths = flattenPaths(schema.fields).filter(f => !f.constraints?.readOnly && !f.constraints?.hidden);
   const samplePaths = paths.slice(0, 3);
 
   const content = `[Quy tắc cập nhật biến số]
 Khi viết phản hồi, nếu có bất kỳ thay đổi nào về trạng thái game, HÃY cập nhật biến bằng khối <UpdateVariable>.
 
 Các biến có thể cập nhật:
-${paths.map(f => `- ${f.path}: ${f.label} (${f.type}${f.constraints.min !== undefined ? `, min: ${f.constraints.min}` : ''}${f.constraints.max !== undefined ? `, max: ${f.constraints.max}` : ''})`).join('\n')}
+${paths.map(f => `- ${f.path}: ${f.label} (${f.type}${f.constraints?.min !== undefined ? `, min: ${f.constraints?.min}` : ''}${f.constraints?.max !== undefined ? `, max: ${f.constraints?.max}` : ''})`).join('\n')}
 
 Quy tắc:
 1. Chỉ cập nhật biến đã thay đổi thực sự

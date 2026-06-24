@@ -13,19 +13,18 @@ import type {
   AutoCreatorConfig,
   MinhNguyetStep,
   StepPreview,
-  CardBlueprint,
 } from '../../types';
 import type { AutoCreatorContext } from './autoCreatorPipeline';
 import { useCardStore } from '../../store/cardStore';
 import { useAutoCreatorStore } from '../../store/autoCreatorStore';
+import { getProfileExtractionContext } from './worldbuildingDefaults';
 import { callAI } from './client';
 import { materializeEntry, nextEntryId } from '../converters/cardDefaults';
-import { allocateTags, wrapWithTag } from '../worldbook/tagManager';
+import { allocateTags } from '../worldbook/tagManager';
 import {
   buildMinhNguyetSystemPrompt,
   getMinhNguyetStepTemplate,
   MINH_NGUYET_STEP_LABELS,
-  WRITING_PRINCIPLES,
   TAG_SPEC,
 } from '../../prompts/minhNguyetTemplates';
 
@@ -165,6 +164,14 @@ async function executeMnStep(
     extraContext = `\n\nĐường thế giới quan được chọn: ${pathLabels[config.mnConfig.worldviewPath]}`;
   }
   
+  if (step === 'npc_creation') {
+    extraContext += `\n\nSố lượng NPC cần tạo: ${config.mnStepConfigs.npc_creation.npcCount}`;
+  }
+
+  if (step === 'opening') {
+    extraContext += `\n\nSố lượng khai bạch (lời chào) thay thế (Alternate Greetings) cần tạo: ${config.mnStepConfigs.opening.alternateGreetings}`;
+  }
+  
   // Thêm card type context
   if (step === 'character_basic' || step === 'color_palette') {
     extraContext += `\n\nLoại thẻ: ${config.mnConfig.cardType === 'single' ? 'Nhân vật đơn' : 'Nhiều nhân vật'}`;
@@ -175,8 +182,22 @@ async function executeMnStep(
     extraContext += `\n\n${TAG_SPEC}`;
   }
 
-  const systemPrompt = buildMinhNguyetSystemPrompt(template, config.idea);
-  const userPrompt = `${contextFromPrevious}${extraContext}
+  // Ép viết siêu chi tiết nếu người dùng cấu hình token lớn
+  let exhaustiveRule = '';
+  if (ctx.generationParams.max_tokens && ctx.generationParams.max_tokens >= 4000) {
+    exhaustiveRule = `\n\n[YÊU CẦU ĐỘ DÀI VÀ CHI TIẾT - QUAN TRỌNG]
+Người dùng đã cấp dung lượng output rất lớn (${ctx.generationParams.max_tokens} tokens). 
+BẠN PHẢI TẬN DỤNG TỐI ĐA dung lượng này để tạo ra nội dung CỰC KỲ CHI TIẾT, TOÀN DIỆN VÀ CHUYÊN SÂU.
+- Tuyệt đối không viết tóm tắt, cộc lốc hay dùng các câu ngắn gọn (trừ khi cố ý vì lý do nghệ thuật).
+- Mở rộng mọi khía cạnh có thể, cung cấp ví dụ chi tiết, đào sâu vào cơ chế, tâm lý, lịch sử hoặc bối cảnh.
+- Không bỏ lỡ bất cứ tiểu tiết nào quan trọng, không dùng các cụm từ "vân vân", "tương tự".`;
+  }
+
+  let systemPrompt = buildMinhNguyetSystemPrompt(template, config.idea);
+  
+  // Inject global Master Instruction & Pipeline Steps
+  systemPrompt += getProfileExtractionContext(ctx.profile);
+  let userPrompt = `${contextFromPrevious}${extraContext}${exhaustiveRule}
 
 Dựa trên ý tưởng và kết quả các bước trước, hãy tạo nội dung cho bước "${MINH_NGUYET_STEP_LABELS[step]?.label ?? step}".
 
@@ -185,6 +206,16 @@ Yêu cầu:
 - Tuân thủ tuyệt đối linh độ, bạch miêu
 - Không dùng bát cổ (từ mơ hồ, ẩn dụ kém, vi biểu cảm)
 - Đảm bảo nhất quán với các bước trước`;
+
+  // ─── Áp dụng Prompt Override từ mnStepConfigs ───
+  const stepConfig = config.mnStepConfigs[step] as unknown as { promptOverride?: string; promptMode: string };
+  if (stepConfig && stepConfig.promptOverride) {
+    if (stepConfig.promptMode === 'replace') {
+      userPrompt = `${contextFromPrevious}${extraContext}${exhaustiveRule}\n\n${stepConfig.promptOverride}`;
+    } else if (stepConfig.promptMode === 'append') {
+      userPrompt += `\n\n[CHỈ THỊ BỔ SUNG TỪ NGƯỜI DÙNG]\n${stepConfig.promptOverride}`;
+    }
+  }
 
   const response = await callAI({
     profile: ctx.profile,

@@ -544,8 +544,8 @@ function FieldTreeNode({
   const isObject = field.type === 'object';
   const name = field.path.split('/').pop() ?? field.path;
   const isSelected = selectedPath === field.path;
-  const isReadonly = name.startsWith('_') || field.constraints.readOnly;
-  const isHidden = name.startsWith('$') || field.constraints.hidden;
+  const isReadonly = name.startsWith('_') || field.constraints?.readOnly;
+  const isHidden = name.startsWith('$') || field.constraints?.hidden;
 
   const typeColor: Record<string, string> = {
     string: 'text-emerald-400', number: 'text-blue-400', boolean: 'text-amber-400',
@@ -579,8 +579,8 @@ function FieldTreeNode({
         {isReadonly && <Lock className="w-2.5 h-2.5 text-amber-400" />}
         {isHidden && <EyeOff className="w-2.5 h-2.5 text-muted-foreground" />}
 
-        {field.constraints.clamp && (
-          <span className="text-[8px] text-blue-400">[{field.constraints.clamp[0]},{field.constraints.clamp[1]}]</span>
+        {field.constraints?.clamp && (
+          <span className="text-[8px] text-blue-400">[{field.constraints?.clamp[0]},{field.constraints?.clamp[1]}]</span>
         )}
 
         {isObject && (
@@ -686,7 +686,7 @@ function SchemaFieldDetail({
         <label className="flex items-center gap-1.5 text-xs cursor-pointer">
           <input
             type="checkbox"
-            checked={!!field.constraints.readOnly}
+            checked={!!field.constraints?.readOnly}
             onChange={e => updateConstraint('readOnly', e.target.checked || undefined)}
             className="rounded border-border"
           />
@@ -695,7 +695,7 @@ function SchemaFieldDetail({
         <label className="flex items-center gap-1.5 text-xs cursor-pointer">
           <input
             type="checkbox"
-            checked={!!field.constraints.hidden}
+            checked={!!field.constraints?.hidden}
             onChange={e => updateConstraint('hidden', e.target.checked || undefined)}
             className="rounded border-border"
           />
@@ -704,7 +704,7 @@ function SchemaFieldDetail({
         <label className="flex items-center gap-1.5 text-xs cursor-pointer">
           <input
             type="checkbox"
-            checked={!!field.constraints.coerce}
+            checked={!!field.constraints?.coerce}
             onChange={e => updateConstraint('coerce', e.target.checked || undefined)}
             className="rounded border-border"
           />
@@ -717,7 +717,7 @@ function SchemaFieldDetail({
         <label className="text-[10px] text-muted-foreground font-medium">Prefault (giá trị mặc định khi AI bỏ trống)</label>
         <input
           type="text"
-          value={String(field.constraints.prefault ?? '')}
+          value={String(field.constraints?.prefault ?? '')}
           onChange={e => updateConstraint('prefault', e.target.value || undefined)}
           placeholder="z.string().prefault('...')"
           className="w-full mt-0.5 px-2 py-1.5 text-xs font-mono rounded-lg border border-border bg-background
@@ -730,7 +730,7 @@ function SchemaFieldDetail({
         <label className="text-[10px] text-muted-foreground font-medium">Describe (mô tả key cho z.record)</label>
         <input
           type="text"
-          value={field.constraints.describe ?? ''}
+          value={field.constraints?.describe ?? ''}
           onChange={e => updateConstraint('describe', e.target.value || undefined)}
           placeholder="z.string().describe('物品名')"
           className="w-full mt-0.5 px-2 py-1.5 text-xs font-mono rounded-lg border border-border bg-background
@@ -745,10 +745,10 @@ function SchemaFieldDetail({
             <label className="text-[10px] text-muted-foreground font-medium">Clamp Min</label>
             <input
               type="number"
-              value={field.constraints.clamp?.[0] ?? ''}
+              value={field.constraints?.clamp?.[0] ?? ''}
               onChange={e => {
                 const min = Number(e.target.value);
-                const max = field.constraints.clamp?.[1] ?? 100;
+                const max = field.constraints?.clamp?.[1] ?? 100;
                 updateConstraint('clamp', [min, max]);
                 updateConstraint('transform', 'clamp');
               }}
@@ -760,9 +760,9 @@ function SchemaFieldDetail({
             <label className="text-[10px] text-muted-foreground font-medium">Clamp Max</label>
             <input
               type="number"
-              value={field.constraints.clamp?.[1] ?? ''}
+              value={field.constraints?.clamp?.[1] ?? ''}
               onChange={e => {
-                const min = field.constraints.clamp?.[0] ?? 0;
+                const min = field.constraints?.clamp?.[0] ?? 0;
                 const max = Number(e.target.value);
                 updateConstraint('clamp', [min, max]);
                 updateConstraint('transform', 'clamp');
@@ -779,7 +779,7 @@ function SchemaFieldDetail({
         <div>
           <label className="text-[10px] text-muted-foreground font-medium">Transform (object/record level)</label>
           <select
-            value={field.constraints.transform ?? ''}
+            value={field.constraints?.transform ?? ''}
             onChange={e => updateConstraint('transform', e.target.value || undefined)}
             className="w-full mt-0.5 px-2 py-1.5 text-xs rounded-lg border border-border bg-background"
           >
@@ -788,10 +788,10 @@ function SchemaFieldDetail({
             <option value="takeRight">takeRight — Giữ N items cuối</option>
             <option value="custom">Custom expression</option>
           </select>
-          {field.constraints.transform === 'custom' && (
+          {field.constraints?.transform === 'custom' && (
             <input
               type="text"
-              value={field.constraints.transformExpr ?? ''}
+              value={field.constraints?.transformExpr ?? ''}
               onChange={e => updateConstraint('transformExpr', e.target.value)}
               placeholder="data => _.pickBy(data, ({ 数量 }) => 数量 > 0)"
               className="w-full mt-1 px-2 py-1.5 text-[10px] font-mono rounded-lg border border-border bg-background
@@ -806,7 +806,7 @@ function SchemaFieldDetail({
         <label className="text-[10px] text-muted-foreground font-medium">Enum Values (dùng cho z.enum / z.record key)</label>
         <input
           type="text"
-          value={(field.constraints.enumValues ?? []).join(', ')}
+          value={(field.constraints?.enumValues ?? []).join(', ')}
           onChange={e => {
             const vals = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
             updateConstraint('enumValues', vals.length > 0 ? vals : undefined);
@@ -823,13 +823,13 @@ function SchemaFieldDetail({
           Check Rules (hướng dẫn AI khi update biến này)
         </label>
         <div className="space-y-1 mt-1">
-          {(field.constraints.checkRules ?? []).map((rule, i) => (
+          {(field.constraints?.checkRules ?? []).map((rule, i) => (
             <div key={i} className="flex items-center gap-1">
               <span className="text-[9px] text-muted-foreground">•</span>
               <input
                 type="text" value={rule}
                 onChange={e => {
-                  const rules = [...(field.constraints.checkRules ?? [])];
+                  const rules = [...(field.constraints?.checkRules ?? [])];
                   rules[i] = e.target.value;
                   updateConstraint('checkRules', rules);
                 }}
@@ -837,14 +837,14 @@ function SchemaFieldDetail({
                   focus:outline-none focus:ring-1 focus:ring-primary/30"
               />
               <button onClick={() => {
-                const rules = (field.constraints.checkRules ?? []).filter((_, j) => j !== i);
+                const rules = (field.constraints?.checkRules ?? []).filter((_, j) => j !== i);
                 updateConstraint('checkRules', rules.length ? rules : undefined);
               }} className="text-muted-foreground hover:text-destructive p-0.5">
                 <Trash2 className="w-2.5 h-2.5" />
               </button>
             </div>
           ))}
-          <button onClick={() => updateConstraint('checkRules', [...(field.constraints.checkRules ?? []), ''])}
+          <button onClick={() => updateConstraint('checkRules', [...(field.constraints?.checkRules ?? []), ''])}
             className="text-[9px] text-primary hover:text-primary/80 flex items-center gap-0.5">
             <Plus className="w-2.5 h-2.5" /> Thêm rule
           </button>
@@ -857,7 +857,7 @@ function SchemaFieldDetail({
           <label className="text-[10px] text-muted-foreground font-medium">Update Range (cho biến số)</label>
           <input
             type="text"
-            value={field.constraints.updateRange ?? ''}
+            value={field.constraints?.updateRange ?? ''}
             onChange={e => updateConstraint('updateRange', e.target.value || undefined)}
             placeholder="0~100"
             className="w-full mt-0.5 px-2 py-1.5 text-xs font-mono rounded-lg border border-border bg-background
@@ -868,7 +868,7 @@ function SchemaFieldDetail({
           <label className="text-[10px] text-muted-foreground font-medium">Format (định dạng)</label>
           <input
             type="text"
-            value={field.constraints.updateFormat ?? ''}
+            value={field.constraints?.updateFormat ?? ''}
             onChange={e => updateConstraint('updateFormat', e.target.value || undefined)}
             placeholder="YYYY-MM-DD HH:MM"
             className="w-full mt-0.5 px-2 py-1.5 text-xs font-mono rounded-lg border border-border bg-background

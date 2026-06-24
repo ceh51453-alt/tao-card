@@ -582,7 +582,7 @@ function FieldEditor({ field, depth, onUpdate, onDelete }: {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const name = field.path.split('/').pop() ?? field.path;
   const hasChildren = field.children && field.children.length > 0;
-  const isReadonly = name.startsWith('_') || field.constraints.readOnly;
+  const isReadonly = name.startsWith('_') || field.constraints?.readOnly;
 
   const typeColors: Record<string, string> = {
     string: 'text-emerald-400', number: 'text-blue-400', boolean: 'text-amber-400',
@@ -610,7 +610,7 @@ function FieldEditor({ field, depth, onUpdate, onDelete }: {
               label: newName,
               constraints: {
                 ...field.constraints,
-                readOnly: newName.startsWith('_') || field.constraints.readOnly,
+                readOnly: newName.startsWith('_') || field.constraints?.readOnly,
               },
             });
           }}
@@ -635,7 +635,7 @@ function FieldEditor({ field, depth, onUpdate, onDelete }: {
         <button
           onClick={() => onUpdate({
             ...field,
-            constraints: { ...field.constraints, readOnly: !field.constraints.readOnly },
+            constraints: { ...field.constraints, readOnly: !field.constraints?.readOnly },
           })}
           title={isReadonly ? 'Readonly (AI không được sửa)' : 'Nhấn để đặt readonly'}
           className={`text-[9px] px-1 py-0.5 rounded transition-colors ${
@@ -647,21 +647,21 @@ function FieldEditor({ field, depth, onUpdate, onDelete }: {
           {isReadonly ? '🔒 RO' : 'RW'}
         </button>
 
-        {field.constraints.clamp && (
+        {field.constraints?.clamp && (
           <span className="text-[9px] px-1 py-0.5 rounded bg-blue-500/10 text-blue-400">
-            [{field.constraints.clamp[0]},{field.constraints.clamp[1]}]
+            [{field.constraints?.clamp[0]},{field.constraints?.clamp[1]}]
           </span>
         )}
 
-        {field.constraints.prefault !== undefined && field.constraints.prefault !== '' && (
+        {field.constraints?.prefault !== undefined && field.constraints?.prefault !== '' && (
           <span className="text-[9px] px-1 py-0.5 rounded bg-violet-500/10 text-violet-400" title="prefault value">
-            ⚡{String(field.constraints.prefault).slice(0, 8)}
+            ⚡{String(field.constraints?.prefault).slice(0, 8)}
           </span>
         )}
 
-        {field.constraints.transform && (
+        {field.constraints?.transform && (
           <span className="text-[9px] px-1 py-0.5 rounded bg-cyan-500/10 text-cyan-400" title="transform">
-            ⚙️{field.constraints.transform}
+            ⚙️{field.constraints?.transform}
           </span>
         )}
 
@@ -689,7 +689,7 @@ function FieldEditor({ field, depth, onUpdate, onDelete }: {
               <label className="text-[9px] text-muted-foreground font-medium">Prefault (mặc định)</label>
               <input
                 type="text"
-                value={String(field.constraints.prefault ?? '')}
+                value={String(field.constraints?.prefault ?? '')}
                 onChange={e => onUpdate({
                   ...field,
                   constraints: { ...field.constraints, prefault: e.target.value || undefined },
@@ -705,7 +705,7 @@ function FieldEditor({ field, depth, onUpdate, onDelete }: {
               <label className="text-[9px] text-muted-foreground font-medium">Describe (mô tả key)</label>
               <input
                 type="text"
-                value={field.constraints.describe ?? ''}
+                value={field.constraints?.describe ?? ''}
                 onChange={e => onUpdate({
                   ...field,
                   constraints: { ...field.constraints, describe: e.target.value || undefined },
@@ -725,10 +725,10 @@ function FieldEditor({ field, depth, onUpdate, onDelete }: {
                 <div className="flex gap-1 mt-0.5">
                   <input
                     type="number"
-                    value={field.constraints.clamp?.[0] ?? ''}
+                    value={field.constraints?.clamp?.[0] ?? ''}
                     onChange={e => {
                       const min = Number(e.target.value);
-                      const max = field.constraints.clamp?.[1] ?? 100;
+                      const max = field.constraints?.clamp?.[1] ?? 100;
                       onUpdate({
                         ...field,
                         constraints: {
@@ -744,9 +744,9 @@ function FieldEditor({ field, depth, onUpdate, onDelete }: {
                   />
                   <input
                     type="number"
-                    value={field.constraints.clamp?.[1] ?? ''}
+                    value={field.constraints?.clamp?.[1] ?? ''}
                     onChange={e => {
-                      const min = field.constraints.clamp?.[0] ?? 0;
+                      const min = field.constraints?.clamp?.[0] ?? 0;
                       const max = Number(e.target.value);
                       onUpdate({
                         ...field,
@@ -767,7 +767,7 @@ function FieldEditor({ field, depth, onUpdate, onDelete }: {
                 <label className="text-[9px] text-muted-foreground font-medium">Update Range (cho AI)</label>
                 <input
                   type="text"
-                  value={field.constraints.updateRange ?? ''}
+                  value={field.constraints?.updateRange ?? ''}
                   onChange={e => onUpdate({
                     ...field,
                     constraints: { ...field.constraints, updateRange: e.target.value || undefined },
@@ -785,7 +785,7 @@ function FieldEditor({ field, depth, onUpdate, onDelete }: {
             <div>
               <label className="text-[9px] text-muted-foreground font-medium">Transform</label>
               <select
-                value={field.constraints.transform ?? ''}
+                value={field.constraints?.transform ?? ''}
                 onChange={e => onUpdate({
                   ...field,
                   constraints: { ...field.constraints, transform: e.target.value || undefined },
@@ -797,10 +797,10 @@ function FieldEditor({ field, depth, onUpdate, onDelete }: {
                 <option value="takeRight">takeRight — Giữ N items cuối</option>
                 <option value="custom">Custom expression</option>
               </select>
-              {field.constraints.transform === 'custom' && (
+              {field.constraints?.transform === 'custom' && (
                 <input
                   type="text"
-                  value={field.constraints.transformExpr ?? ''}
+                  value={field.constraints?.transformExpr ?? ''}
                   onChange={e => onUpdate({
                     ...field,
                     constraints: { ...field.constraints, transformExpr: e.target.value },
@@ -819,14 +819,14 @@ function FieldEditor({ field, depth, onUpdate, onDelete }: {
               Check Rules (hướng dẫn AI update biến này)
             </label>
             <div className="space-y-1 mt-0.5">
-              {(field.constraints.checkRules ?? []).map((rule, i) => (
+              {(field.constraints?.checkRules ?? []).map((rule, i) => (
                 <div key={i} className="flex items-center gap-1">
                   <span className="text-[9px] text-muted-foreground">•</span>
                   <input
                     type="text"
                     value={rule}
                     onChange={e => {
-                      const rules = [...(field.constraints.checkRules ?? [])];
+                      const rules = [...(field.constraints?.checkRules ?? [])];
                       rules[i] = e.target.value;
                       onUpdate({ ...field, constraints: { ...field.constraints, checkRules: rules } });
                     }}
@@ -835,7 +835,7 @@ function FieldEditor({ field, depth, onUpdate, onDelete }: {
                   />
                   <button
                     onClick={() => {
-                      const rules = (field.constraints.checkRules ?? []).filter((_, j) => j !== i);
+                      const rules = (field.constraints?.checkRules ?? []).filter((_, j) => j !== i);
                       onUpdate({ ...field, constraints: { ...field.constraints, checkRules: rules.length ? rules : undefined } });
                     }}
                     className="text-muted-foreground hover:text-red-400 p-0.5"
@@ -846,7 +846,7 @@ function FieldEditor({ field, depth, onUpdate, onDelete }: {
               ))}
               <button
                 onClick={() => {
-                  const rules = [...(field.constraints.checkRules ?? []), ''];
+                  const rules = [...(field.constraints?.checkRules ?? []), ''];
                   onUpdate({ ...field, constraints: { ...field.constraints, checkRules: rules } });
                 }}
                 className="text-[9px] text-primary hover:text-primary/80 flex items-center gap-0.5"
