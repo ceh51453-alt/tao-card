@@ -1,0 +1,240 @@
+/**
+ * worldbookHealthCheck.ts — Kiểm tra cấu hình Worldbook theo guide
+ * Quét toàn bộ entries, trả về danh sách cảnh báo + auto-fix suggestions
+ */
+
+import type { LorebookEntry } from '../../types/lorebook.types';
+import type { CardType } from './worldbookConfig';
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TYPES
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface HealthWarning {
+  entryId: number;
+  comment: string;
+  level: 'error' | 'warning' | 'info';
+  code: string;
+  message: string;
+  autoFixable: boolean;
+  fix?: {
+    // Entry-level patches
+    keys?: string[];
+    secondary_keys?: string[];
+    constant?: boolean;
+    selective?: boolean;
+    insertion_order?: number;
+    // Extension-level patches (flat — merged into entry.extensions)
+    extensions?: Record<string, unknown>;
+  };
+}
+
+export interface HealthReport {
+  errors: number;
+  warnings: number;
+  infos: number;
+  items: HealthWarning[];
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// KEYWORD VALIDATION HELPERS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Phát hiện dấu phẩy full-width (，) trong keys */
+function hasFullWidthComma(keys: string[]): boolean {
+  return keys.some(k => k.includes('，'));
+}
+
+/** Phát hiện khoảng trắng sau dấu phẩy trong keys (phải check raw string) */
+function hasSpaceAfterComma(keys: string[]): boolean {
+  // Trường hợp keys đã được tách thành array → check key bắt đầu/kết thúc bằng space
+  return keys.some(k => k.startsWith(' ') || k.endsWith(' '));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MAIN HEALTH CHECK
+// ═══════════════════════════════════════════════════════════════════════════
+
+export function checkWorldbookHealth(
+  entries: LorebookEntry[],
+  cardType: CardType,
+): HealthReport {
+  const items: HealthWarning[] = [];
+
+  for (const entry of entries) {
+    if (!entry.enabled) continue; // Skip disabled entries
+
+    const ext = entry.extensions;
+
+    // ─── 1. Đệ quy chưa bật ─────────────────────────────────────────
+    if (!ext.exclude_recursion || !ext.prevent_recursion) {
+      items.push({
+        entryId: entry.id,
+        comment: entry.comment,
+        level: 'error',
+        code: 'RECURSION_OFF',
+        message: 'Đệ quy chưa bật đầy đủ. Guide: TẤT CẢ entries phải bật exclude_recursion + prevent_recursion.',
+        autoFixable: true,
+        fix: { extensions: { exclude_recursion: true, prevent_recursion: true } },
+      });
+    }
+
+    // ─── 2. Thẻ đơn + entry nhân vật dùng selective (quy luật thép) ──
+    // Heuristic: nếu comment chứa "_Tính cách", "_Ngoại hình", "_Bối cảnh",
+    // "_NSFW", "_Thông tin" và cardType=single → phải constant
+    if (cardType === 'single' && !entry.constant && isCharacterDetailEntry(entry)) {
+      items.push({
+        entryId: entry.id,
+        comment: entry.comment,
+        level: 'error',
+        code: 'SINGLE_CARD_NOT_CONSTANT',
+        message: 'Thẻ nhân vật đơn: entry nhân vật PHẢI constant=true (quy luật thép). Đang để selective.',
+        autoFixable: true,
+        fix: { constant: true, selective: false },
+      });
+    }
+
+    // ─── 3. Keywords dùng dấu phẩy full-width ────────────────────────
+    if (hasFullWidthComma(entry.keys) || hasFullWidthComma(entry.secondary_keys)) {
+      items.push({
+        entryId: entry.id,
+        comment: entry.comment,
+        level: 'error',
+        code: 'FULLWIDTH_COMMA',
+        message: 'Keywords dùng dấu phẩy full-width (，). Phải dùng dấu phẩy tiếng Anh (,).',
+        autoFixable: true,
+        fix: {
+          keys: entry.keys.flatMap(k => k.split('，')).map(k => k.trim()).filter(Boolean),
+          secondary_keys: entry.secondary_keys.flatMap(k => k.split('，')).map(k => k.trim()).filter(Boolean),
+        },
+      });
+    }
+
+    // ─── 4. Keywords có khoảng trắng thừa ────────────────────────────
+    if (hasSpaceAfterComma(entry.keys) || hasSpaceAfterComma(entry.secondary_keys)) {
+      items.push({
+        entryId: entry.id,
+        comment: entry.comment,
+        level: 'warning',
+        code: 'KEYWORD_SPACE',
+        message: 'Keywords có khoảng trắng thừa (đầu/cuối). Có thể làm keyword không kích hoạt.',
+        autoFixable: true,
+        fix: {
+          keys: entry.keys.map(k => k.trim()),
+          secondary_keys: entry.secondary_keys.map(k => k.trim()),
+        },
+      });
+    }
+
+    // ─── 5. Entry xanh lá không có keyword ───────────────────────────
+    if (!entry.constant && entry.selective && entry.keys.length === 0) {
+      items.push({
+        entryId: entry.id,
+        comment: entry.comment,
+        level: 'error',
+        code: 'SELECTIVE_NO_KEYS',
+        message: 'Entry xanh lá (selective) nhưng không có keyword. Entry sẽ KHÔNG BAO GIỜ được kích hoạt.',
+        autoFixable: false,
+      });
+    }
+
+    // ─── 6. Insertion order bất hợp lý ───────────────────────────────
+    // Worldview ở after_char hoặc NPC ở before_char
+    if (entry.constant && ext.position === 1 && entry.insertion_order <= 3) {
+      // Có thể là worldview đặt sai vị trí (after_char thay vì before_char)
+      items.push({
+        entryId: entry.id,
+        comment: entry.comment,
+        level: 'warning',
+        code: 'POSITION_MISMATCH',
+        message: `Entry thường trú (order=${entry.insertion_order}) ở after_char. Thế giới quan nên đặt ở before_char (position 0).`,
+        autoFixable: true,
+        fix: { extensions: { position: 0 } },
+      });
+    }
+
+    // ─── 7. D0 entry không set role=system ───────────────────────────
+    if (ext.position === 4 && ext.depth === 0 && ext.role !== 0) {
+      items.push({
+        entryId: entry.id,
+        comment: entry.comment,
+        level: 'warning',
+        code: 'D0_NOT_SYSTEM',
+        message: 'Entry D0 (depth=0) nên set role=system để có hiệu quả chỉ đạo tốt nhất.',
+        autoFixable: true,
+        fix: { extensions: { role: 0 } },
+      });
+    }
+
+    // ─── 8. D1+ entry tồn tại ────────────────────────────────────────
+    if (ext.position === 4 && ext.depth > 0) {
+      items.push({
+        entryId: entry.id,
+        comment: entry.comment,
+        level: 'error',
+        code: 'DEPTH_NOT_ZERO',
+        message: `Entry @depth=${ext.depth}. Guide: KHÔNG dùng D1+ — chỉ D0 mới an toàn. D1+ phá vỡ lịch sử chat.`,
+        autoFixable: true,
+        fix: { extensions: { depth: 0, role: 0 } },
+      });
+    }
+
+    // ─── 9. scan_depth=null cho entry xanh lá ────────────────────────
+    if (!entry.constant && entry.selective && ext.scan_depth === null) {
+      items.push({
+        entryId: entry.id,
+        comment: entry.comment,
+        level: 'info',
+        code: 'SCAN_DEPTH_NULL',
+        message: 'Entry xanh lá chưa set scan_depth. Khuyến nghị đặt 2 (quét 2 tin nhắn gần nhất).',
+        autoFixable: true,
+        fix: { extensions: { scan_depth: 2 } },
+      });
+    }
+
+    // ─── 10. Keyword chỉ có 1 từ khóa cho NPC/character ─────────────
+    if (!entry.constant && entry.selective && entry.keys.length === 1) {
+      items.push({
+        entryId: entry.id,
+        comment: entry.comment,
+        level: 'info',
+        code: 'FEW_KEYWORDS',
+        message: 'Chỉ có 1 keyword. Guide: nên bao phủ tất cả cách gọi (tên đầy đủ, biệt danh, ngoại hiệu, chức vụ).',
+        autoFixable: false,
+      });
+    }
+  }
+
+  return {
+    errors: items.filter(i => i.level === 'error').length,
+    warnings: items.filter(i => i.level === 'warning').length,
+    infos: items.filter(i => i.level === 'info').length,
+    items,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HEURISTIC HELPERS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Heuristic: entry này có phải là chi tiết nhân vật không? */
+function isCharacterDetailEntry(entry: LorebookEntry): boolean {
+  const c = entry.comment.toLowerCase();
+  const detailPatterns = [
+    '_tính cách', '_ngoại hình', '_bối cảnh', '_nsfw',
+    '_thông tin', '_cơ bản', '_personality', '_appearance',
+    '_background', '_detail', '_skills', '_kỹ năng',
+  ];
+  // Nếu comment chứa pattern chia nhỏ nhân vật → đây là entry nhân vật
+  if (detailPatterns.some(p => c.includes(p))) return true;
+
+  // Nếu entry ở after_char (pos 1) với order 10-99 và có nội dung dài → có thể là nhân vật
+  if (entry.extensions.position === 1 &&
+      entry.insertion_order >= 10 &&
+      entry.insertion_order < 100 &&
+      entry.content.length > 200) {
+    return true;
+  }
+
+  return false;
+}

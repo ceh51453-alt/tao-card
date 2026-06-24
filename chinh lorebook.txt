@@ -1,0 +1,48 @@
+Worldbook_Standard_Configuration:
+  Global_Rules:
+    Recursion_Prevention: 
+      - Prevent Recursion: TRUE
+      - Prevent Secondary Recursion: TRUE
+      - Note: Áp dụng bắt buộc cho toàn bộ 100% các mục bên dưới để chống sụp đổ bộ nhớ.
+    Tag_Mapping_And_Strict_Preservation: LỆNH TUYỆT ĐỐI: CHỈ ĐƯỢC PHÉP đọc dữ liệu từ các thẻ tag (ví dụ: <Worldview>, <Meta>, <System>, <Mechanic>, <Rule>, <Character>, <Location>, <Timeline>) để phân loại chuẩn xác vào các Group tương ứng bên dưới dựa trên trường Target_Tags.
+
+  Hierarchy_Groups:
+    Group_1_Core_System_And_Meta_Setup:
+      Target_Tags: "<Meta>, <System>, <Mechanic>, <Rule>"
+      Description: "Hệ Thống Sức Mạnh Cốt Lõi & Thiết Lập Biến Số User (META_SETUP).Hệ thống cơ chế,cơ chế & Luật lệ của thế giới"
+      Strategy: Constant
+      Position: At Depth (Role: System)
+      Depth: 0
+      Order: 900
+      
+    Group_2_World_Building_And_Natural_Laws:
+      Target_Tags: "<Worldview>, <Timeline>"
+      Description: "Thế Giới Quan & Quy Luật Tự Nhiên, Dòng thời gian. Chứa thiết lập bối cảnh vĩ mô, sinh thái, chủng tộc và nền tảng thế giới."
+      Strategy: Constant
+      Position: At Depth (Role: System)
+      Depth: 4
+      Order: 800
+      
+    Group_3_Characters:
+      Target_Tags: "<Character>"
+      Description: "Nhân Vật Chính,Nhân Vật Phụ, Sinh Vật, NPC trong thế giới."
+      Strategy: Normal
+      Position: After Character
+      Depth: null
+      Order: 200
+      
+    Group_4_Factions_Organizations_Religions:
+      Target_Tags: "<Faction>, <Organization>, <Religion>"
+      Description: "Phe Phái, Tổ Chức & Tôn Giáo. Bao gồm thế lực, cơ cấu vận hành, cấp bậc và mâu thuẫn chính trị."
+      Strategy: Normal
+      Position: Before Character
+      Depth: null
+      Order: 150
+      
+    Group_5_Locations_And_Areas:
+      Target_Tags: "<Location>, <Area>"
+      Description: "Địa Điểm & Khu Vực. Cảnh quan, kiến trúc, môi trường vật lý."
+      Strategy: Normal
+      Position: Before Character
+      Depth: null
+      Order: 100

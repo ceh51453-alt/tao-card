@@ -1,0 +1,178 @@
+# ------------------------------------------------------------------------------
+# BƯỚC 1: TẠO THẾ GIỚI QUAN & META_SETUP (KHỞI NGUYÊN)
+# ------------------------------------------------------------------------------
+[LUỒNG XỬ LÝ DỮ LIỆU]: Thu thập toàn diện -> Lọc rác nghiêm ngặt -> Trình bày chuẩn hóa.
+
+[NHIỆM VỤ CHÍNH]: Quét toàn bộ nội dung từ link Wiki được cung cấp. Tạo ra ĐÚNG 2 ENTRY nền tảng: THẾ GIỚI QUAN và META.
+
+[QUY TẮC TRÌNH BÀY (LỆNH TUYỆT ĐỐI - CẤM VI PHẠM)]:
+1. CẤM WALL OF TEXT: Tuyệt đối không viết các đoạn văn dài dính liền nhau. Bắt buộc chia nhỏ ý, sử dụng triệt để gạch đầu dòng (-, +).
+2. TỐI ƯU ĐỌC HIỂU: Nội dung tạo ra phải cực kỳ chi tiết, cặn kẽ, đi sâu vào bản chất cốt lõi nhưng bắt buộc phải ngắt dòng rõ ràng. Phải **In đậm** các danh từ riêng, khái niệm, thời đại.
+3. BỌC THẺ DỮ LIỆU: Nội dung xuất ra phải nằm trọn vẹn bên trong các thẻ HTML-like được quy định sẵn. Không để text trôi nổi bên ngoài.
+
+[YÊU CẦU CHI TIẾT CHO TỪNG ENTRY]:
+
+1. ENTRY [THẾ GIỚI QUAN]:
+- MÔ TẢ: Phác thảo chi tiết toàn cảnh vũ trụ, bối cảnh thời đại, khái niệm cốt lõi và bầu không khí chung của thế giới trong Wiki.
+- RÀNG BUỘC & BỘ LỌC RÁC: CHỈ ĐƯỢC TẠO DUY NHẤT Thế Giới Quan. Cấm tuyệt đối liệt kê Nhân vật, Hệ thống sức mạnh, Khu vực hay Vật phẩm vào phần này.
+- ĐỊNH DẠNG ĐẦU RA BẮT BUỘC:
+<Worldview>
+- **Khái niệm vũ trụ:** (Phân tích chi tiết bản chất vũ trụ, cấu trúc không-thời gian của thế giới này)
+- **Bối cảnh thời đại:** (Miêu tả chi tiết bối cảnh lịch sử, xã hội, các kỷ nguyên và nền văn minh)
+- **Luật lệ tự nhiên cốt lõi:** (Trình bày chi tiết các định luật sinh tồn, quy luật tối cao chi phối thế giới)
+</Worldview>
+
+2. ENTRY [META_SETUP]:
+- MÔ TẢ: Thiết lập chi tiết quy tắc tồn tại song song giữa biến số `<user>` và Nhân vật chính (Main gốc) của thế giới này.
+- ĐỊNH NGHĨA BIẾN SỐ: Khẳng định rõ `<user>` là một thực thể vô định, một biến số trống không có nhân dạng hay định nghĩa cố định (có thể là bất kỳ ai, bất kỳ hình dạng nào). Cấm AI tự ý phác họa ngoại hình hay tính cách cho `<user>`.
+- ĐỊNH DẠNG ĐẦU RA BẮT BUỘC:
+<Meta>
+- **Quy tắc tồn tại:** (Trình bày chi tiết cách biến số <user> giáng lâm và tồn tại song song với Main gốc mà không phá vỡ ranh giới thực tại)
+- **Định nghĩa <user>:** (Khẳng định chi tiết và rõ ràng <user> là thực thể vô định, tuyệt đối ngăn chặn AI tự họa ngoại hình/tính cách)
+</Meta>
+
+# ------------------------------------------------------------------------------
+# BƯỚC 2: TẠO HỆ THỐNG, CƠ CHẾ & QUY TẮC (LUẬT LỆ VẬN HÀNH)
+# ------------------------------------------------------------------------------
+[LUỒNG XỬ LÝ DỮ LIỆU]: Quét sâu (Deep Scan) -> Lọc rác tuyệt đối -> Phân loại và Bọc thẻ chuẩn xác.
+
+[NHIỆM VỤ CHÍNH]: Quét sạch toàn bộ dữ liệu Wiki để tạo các entry chuyên sâu về [HỆ THỐNG] (Sức mạnh, Ma thuật, Công nghệ, Kinh tế...), [CƠ CHẾ] (Cách thế giới vận hành), và [QUY TẮC] (Định luật, Quy định, Luật lệ).
+
+[RÀNG BUỘC NGHIÊM NGẶT & LỆNH THỰC THI KIÊN QUYẾT]:
+- PHẠM VI XỬ LÝ: CHỈ ĐƯỢC PHÉP tạo nội dung thuộc 3 danh mục trên.
+- LƯỚI LỌC DỮ LIỆU: CẤM TUYỆT ĐỐI đưa bất kỳ yếu tố nào về Nhân vật, Khu vực, Vật phẩm, hay Cốt truyện vào đây. Nếu thấy dữ liệu rác, lập tức loại bỏ.
+- QUY TRÌNH THỰC THI: Quét theo chiều sâu (Deep Scan) toàn bộ Wiki. Tạo liên tục và chia thành nhiều batch.
+- LỆNH TUYỆT ĐỐI: KHÔNG ĐƯỢC DỪNG LẠI cho đến khi vắt kiệt 100% mọi Hệ thống/Cơ chế/Quy tắc có thể tồn tại trong Lore. Nếu đạt giới hạn text của một lần trả lời, tự động đóng thẻ hiện tại và chờ lệnh "Tiếp tục".
+
+[QUY TẮC TRÌNH BÀY (CẤM VI PHẠM)]:
+1. CẤM WALL OF TEXT: Dùng gạch đầu dòng (-, +). Nội dung phải được phân tích cực kỳ chi tiết, cặn kẽ nhưng bắt buộc phải ngắt dòng rõ ràng, không viết dính chùm.
+2. NHẤN MẠNH: Bắt buộc **In đậm** tên hệ thống, tên cảnh giới, cấp độ, hoặc thuật ngữ quan trọng.
+3. BỌC THẺ DỮ LIỆU: Phân loại rạch ròi bằng 3 thẻ <System>, <Mechanic>, <Rule>. Không gộp chung.
+
+[ĐỊNH DẠNG ĐẦU RA BẮT BUỘC (Lặp lại cấu trúc này cho mỗi mục tìm thấy)]:
+
+1. Đối với dữ liệu Hệ thống (Sức mạnh, Kinh tế, Giai cấp):
+<System>
+**Tên Hệ Thống:** (Điền tên)
+- **Phân loại:** (Sức mạnh / Ma thuật / Kinh tế / Chính trị...)
+- **Bản chất cốt lõi:** (Giải thích cực kỳ chi tiết, cặn kẽ về nguồn gốc, bản chất và cách hệ thống này vận hành thế giới)
+- **Cấu trúc / Cảnh giới / Cấp độ:**
+  + **[Tên Cấp 1]:** Phân tích chi tiết đặc điểm, sức mạnh, điều kiện thăng cấp và biểu hiện thực tế.
+  + **[Tên Cấp 2]:** Phân tích chi tiết đặc điểm, sức mạnh, điều kiện thăng cấp và biểu hiện thực tế.
+</System>
+
+2. Đối với dữ liệu Cơ chế (Cách một hiện tượng/vật chất vận hành):
+<Mechanic>
+**Tên Cơ Chế:** (Điền tên)
+- **Phạm vi tác động:** (Phân tích chi tiết đối tượng/sự vật/khái niệm bị ảnh hưởng bởi cơ chế này)
+- **Cách thức hoạt động:**
+  + Bước 1 / Điều kiện kích hoạt: (Mô tả chi tiết các yêu cầu, hoàn cảnh, hoặc cái giá phải trả để kích hoạt)
+  + Bước 2 / Hiệu ứng tạo ra: (Mô tả chi tiết quá trình biến đổi và kết quả thực tế lên môi trường/mục tiêu)
+</Mechanic>
+
+3. Đối với dữ liệu Quy tắc (Định luật tự nhiên, Luật lệ xã hội, Lời nguyền):
+<Rule>
+**Tên Quy Tắc:** (Điền tên)
+- **Tính chất:** (Tuyệt đối / Có thể phá vỡ / Ràng buộc pháp lý / Lời nguyền...)
+- **Nội dung quy tắc:** (Ghi rõ và phân tích chi tiết luật lệ đó quy định điều gì, ai phải tuân theo)
+- **Hệ quả vi phạm:** (Mô tả chi tiết các hình phạt, tổn thương linh hồn, hoặc hậu quả vật lý nếu phá luật)
+</Rule>
+
+# ------------------------------------------------------------------------------
+# BƯỚC 3: TẠO HỒ SƠ NHÂN VẬT (THỰC THỂ TỒN TẠI)
+# ------------------------------------------------------------------------------
+[LUỒNG XỬ LÝ DỮ LIỆU]: Quét toàn diện nhân vật -> Ép ranh giới dữ liệu -> Trình bày chuẩn hóa.
+
+[NHIỆM VỤ CHÍNH]: Quét sạch toàn bộ dữ liệu Wiki để tạo các entry chi tiết về TOÀN BỘ [NHÂN VẬT] (Bao gồm: Nhân vật chính, Phụ, Phản diện, và cả Quần chúng có tên - Tên, Thân thế, Chủng tộc, Chức vụ, Ngoại hình, Quan hệ).
+
+[RÀNG BUỘC NGHIÊM NGẶT & LỆNH THỰC THI KIÊN QUYẾT]:
+- PHẠM VI XỬ LÝ: CHỈ ĐƯỢC PHÉP tạo nội dung xoay quanh con người/thực thể sống/nhân vật.
+- LƯỚI LỌC DỮ LIỆU: CẤM TUYỆT ĐỐI đưa các giải thích dài dòng về Hệ thống, Cơ chế, Khu vực, Vật phẩm hay Cốt truyện vào đây (để giữ cấu trúc phẳng, tránh lặp dữ liệu).
+- QUY TRÌNH THỰC THI: Quét toàn bộ danh sách nhân vật. Tạo liên tục và chia thành nhiều batch.
+- LỆNH TUYỆT ĐỐI: KHÔNG ĐƯỢC DỪNG LẠI cho đến khi vắt kiệt 100% mọi Nhân vật có mặt trong Wiki. Nếu đạt giới hạn text của một lần trả lời, tự động đóng thẻ hiện tại và chờ lệnh "Tiếp tục".
+
+[QUY TẮC TRÌNH BÀY (CẤM VI PHẠM)]:
+1. CẤM WALL OF TEXT: Dùng gạch đầu dòng (-, +). Cung cấp thông tin cực kỳ chi tiết, cặn kẽ, đầy đủ nhưng bắt buộc phải ngắt dòng gọn gàng.
+2. NHẤN MẠNH: Bắt buộc **In đậm** tên nhân vật, danh hiệu, chủng tộc, tên kỹ năng.
+3. BỘ LỌC RANH GIỚI DỮ LIỆU (QUAN TRỌNG): 
+   + Đối với sức mạnh/năng lực: Chỉ miêu tả CHI TIẾT HIỆU ỨNG BỀ NGOÀI (Ví dụ: "Bắn ra ngọn lửa đen thiêu rụi không gian, nhiệt độ có thể nung chảy mọi thứ..."). Tuyệt đối không giải thích cơ chế/nguyên lý vận hành tại đây (Nguyên lý thuộc về thẻ <Mechanic> ở Bước 2).
+4. BỌC THẺ DỮ LIỆU: Mỗi nhân vật phải nằm trong một thẻ <Character> riêng biệt.
+
+[ĐỊNH DẠNG ĐẦU RA BẮT BUỘC (Lặp lại cấu trúc này cho mỗi nhân vật tìm thấy)]:
+
+<Character>
+**Tên Nhân Vật:** (Điền tên đầy đủ)
+- **Bí danh / Danh hiệu:** (Điền chi tiết nếu có)
+- **Chủng tộc / Thế lực:** (Liệt kê chi tiết nguồn gốc chủng tộc, tổ chức trực thuộc)
+- **Thân thế / Vị trí:** (Miêu tả chi tiết vai trò, địa vị trong thế giới: Bang chủ, Học sinh, Thần minh...)
+- **Ngoại hình:** (Miêu tả cực kỳ chi tiết diện mạo, vóc dáng, màu tóc/mắt, thần thái, trang phục, vết sẹo, phụ kiện đặc trưng)
+- **Đặc điểm cốt lõi:** (Phân tích chi tiết tính cách, tâm lý, lý tưởng hoặc mục đích sống)
+- **Năng lực / Sức mạnh chính:** 
+  + **[Tên Kỹ năng 1]:** (Miêu tả chi tiết uy lực và biểu hiện/hiệu ứng bề ngoài của kỹ năng)
+  + **[Tên Kỹ năng 2]:** (Miêu tả chi tiết uy lực và biểu hiện/hiệu ứng bề ngoài của kỹ năng)
+- **Mối quan hệ cốt lõi:** (Liệt kê và giải thích chi tiết mối quan hệ với Đồng minh, Kẻ thù, Gia đình, Cấp dưới...)
+</Character>
+
+# ------------------------------------------------------------------------------
+# BƯỚC 4: TẠO KHU VỰC (KHÔNG GIAN & ĐỊA LÝ)
+# ------------------------------------------------------------------------------
+[LUỒNG XỬ LÝ DỮ LIỆU]: Quét không gian đa chiều -> Ràng buộc địa lý -> Trình bày chuẩn hóa.
+
+[NHIỆM VỤ CHÍNH]: Quét sạch toàn bộ dữ liệu Wiki để tạo các entry chi tiết về [KHU VỰC] (Bao gồm: Đa vũ trụ, Chiều không gian, Hành tinh, Lục địa, Quốc gia, Thành phố, Kiến trúc, Tòa nhà, Căn phòng...).
+
+[RÀNG BUỘC NGHIÊM NGẶT & LỆNH THỰC THI KIÊN QUYẾT]:
+- PHẠM VI XỬ LÝ: CHỈ ĐƯỢC PHÉP tạo nội dung mô tả không gian, địa lý và kiến trúc.
+- LƯỚI LỌC DỮ LIỆU: CẤM TUYỆT ĐỐI trộn lẫn thông tin về Nhân vật cư trú, Hệ thống vận hành, Quy tắc hay Cốt truyện vào mô tả địa lý. Chỉ miêu tả thuần túy về Không gian, Địa hình, Khí hậu, và Kiến trúc.
+- QUY TRÌNH THỰC THI: Quét từ quy mô vĩ mô (Macro) xuống vi mô (Micro). Tạo liên tục và chia thành nhiều batch.
+- LỆNH TUYỆT ĐỐI: KHÔNG ĐƯỢC DỪNG LẠI cho đến khi vắt kiệt 100% mọi Khu vực có trong Wiki. Nếu đạt giới hạn text của một lần trả lời, tự động đóng thẻ hiện tại và chờ lệnh "Tiếp tục".
+
+[QUY TẮC TRÌNH BÀY (CẤM VI PHẠM)]:
+1. CẤM WALL OF TEXT: Dùng gạch đầu dòng (-, +). Miêu tả không gian phải cực kỳ chi tiết, sinh động, cặn kẽ nhưng bắt buộc phải ngắt dòng rõ ràng.
+2. NHẤN MẠNH: Bắt buộc **In đậm** tên địa danh, quy mô, và các đặc trưng môi trường.
+3. BỌC THẺ DỮ LIỆU: Mỗi địa điểm phải nằm trọn vẹn trong một thẻ <Location>.
+
+[ĐỊNH DẠNG ĐẦU RA BẮT BUỘC (Lặp lại cấu trúc này cho mỗi địa điểm tìm thấy)]:
+
+<Location>
+**Tên Khu Vực:** (Điền tên địa danh)
+- **Quy mô / Loại hình:** (Đa vũ trụ / Lục địa / Thành phố / Tòa nhà / Căn phòng...)
+- **Đặc điểm môi trường / Địa lý:** (Miêu tả cực kỳ chi tiết khí hậu, địa hình, thảm thực vật, tài nguyên, và cảnh quan bề ngoài)
+- **Đặc trưng kiến trúc / Không gian:** (Miêu tả chi tiết cấu trúc vật lý, vật liệu xây dựng, phong cách kiến trúc hoặc đặc tính không gian kỳ bí)
+- **Phân khu trực thuộc (Nếu có):** 
+  + **[Tên khu vực nhỏ hơn 1]:** Miêu tả chi tiết chức năng và cảnh quan của phân khu này.
+  + **[Tên khu vực nhỏ hơn 2]:** Miêu tả chi tiết chức năng và cảnh quan của phân khu này.
+</Location>
+
+# ------------------------------------------------------------------------------
+# BƯỚC 5: TẠO DÒNG THỜI GIAN (LỊCH SỬ & HIỆU ỨNG CÁNH BƯỚM)
+# ------------------------------------------------------------------------------
+[LUỒNG XỬ LÝ DỮ LIỆU]: Quét sâu tuyến tính -> Thiết lập Cảnh báo Biến số -> Trình bày chuẩn hóa đa phân đoạn (Multi-batch).
+
+[NHIỆM VỤ CHÍNH]: Quét sạch toàn bộ dữ liệu Wiki để tạo toàn bộ các mốc sự kiện trong [DÒNG THỜI GIAN] (Timeline / Lịch sử / Các sự kiện cốt lõi) theo đúng trình tự thời gian.
+
+[LỆNH THỰC THI KIÊN QUYẾT]:
+- Tạo liên tục và bắt buộc chia thành nhiều batch. Không giới hạn số lượng entry.
+- LỆNH TUYỆT ĐỐI: KHÔNG ĐƯỢC DỪNG LẠI cho đến khi vắt kiệt 100% mọi mốc sự kiện lịch sử có trong Wiki (từ khởi nguyên vũ trụ đến hiện tại). Nếu đạt giới hạn text của một lần trả lời, tự động đóng thẻ hiện tại và chờ lệnh "Tiếp tục".
+
+[QUY TẮC TRÌNH BÀY (CẤM VI PHẠM)]:
+1. CẤM WALL OF TEXT: Dùng gạch đầu dòng (-, +). Phải miêu tả cực kỳ chi tiết, cặn kẽ diễn biến sự kiện, tuyệt đối không được vắn tắt qua loa, nhưng vẫn bắt buộc phải ngắt dòng.
+2. NHẤN MẠNH: Bắt buộc **In đậm** mốc thời gian (Năm/Kỷ nguyên) và Tên sự kiện.
+3. BỘ LỌC RANH GIỚI: CHỈ liệt kê chi tiết diễn biến sự kiện. CẤM giải thích lại năng lực, cơ chế hay thân thế nhân vật tại đây (để tránh lặp dữ liệu với Bước 2 và Bước 3).
+4. BỌC THẺ DỮ LIỆU: Bọc toàn bộ trong thẻ <Timeline>, mỗi sự kiện chi tiết bọc thêm <Event>.
+
+[ĐIỀU KIỆN KÍCH HOẠT ĐẶC BIỆT (HIỆU ỨNG CÁNH BƯỚM)]:
+- LỆNH TUYỆT ĐỐI TỚI AI: Bắt buộc phải in nguyên văn đoạn [CẢNH BÁO HỆ THỐNG] dưới đây vào NGAY ĐẦU thẻ <Timeline> của Batch đầu tiên. AI phải hiểu rõ cốt truyện gốc sẽ bị hủy bỏ hoàn toàn ngay khi biến số `<user>` xuất hiện và có hành động tương tác.
+
+[ĐỊNH DẠNG ĐẦU RA BẮT BUỘC]:
+
+<Timeline>
+[CẢNH BÁO HỆ THỐNG - HIỆU ỨNG CÁNH BƯỚM]: Dòng thời gian gốc dưới đây CHỈ MANG TÍNH CHẤT THAM KHẢO. Khi biến số `<user>` chính thức giáng lâm và có bất kỳ hành động tương tác nào, Timeline gốc này sẽ ngay lập tức bị phá vỡ. Mọi sự kiện tương lai sẽ rẽ nhánh, bóp méo và thay đổi hoàn toàn dựa trên quỹ đạo hành động của `<user>`, vô hiệu hóa định mệnh đã được sắp đặt sẵn của thế giới này.
+
+- **[Mốc Thời Gian 1] - Tên Sự Kiện:**
+  <Event> (Miêu tả chi tiết, cặn kẽ diễn biến cốt lõi của sự kiện này: ai đã làm gì, mâu thuẫn diễn ra thế nào, hậu quả để lại ra sao) </Event>
+
+- **[Mốc Thời Gian 2] - Tên Sự Kiện:**
+  <Event> (Miêu tả chi tiết, cặn kẽ diễn biến cốt lõi của sự kiện này: ai đã làm gì, mâu thuẫn diễn ra thế nào, hậu quả để lại ra sao) </Event>
+
+(Tiếp tục liệt kê chi tiết cho đến khi vắt kiệt dữ liệu...)
+</Timeline>

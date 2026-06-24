@@ -1,0 +1,296 @@
+/**
+ * src/lib/ai/agentLoop.ts — Client-Agent Loop for AI Copilot
+ * Spec Phần 9.5: runCopilotLoop, handleAction, applyAction
+ */
+
+import type { ChatMessage, CharacterCardV3, ProxyProfile, GenerationParams, LorebookEntry } from '../../types';
+import type { AIAction, AIResponse, WorldbuildingMode, CopilotMessage } from './copilotTypes';
+import { callAI } from './client';
+import { buildCopilotSystemPrompt } from './copilotPrompts';
+import { parseAIResponseJSON } from './jsonExtract';
+import { materializeEntry, nextEntryId } from '../converters/cardDefaults';
+import { toolsEngine } from '../toolsEngine';
+
+// Completeness Protocol
+const CRITICAL_ABSOLUTE_COMPLETENESS_PROTOCOL = `
+[LỆNH THỰC THI KIÊN QUYẾT TỪ HỆ THỐNG]: 
+Ngay cả khi bạn nghĩ rằng bạn đã viết đủ, HÃY TIẾP TỤC TÌM KIẾM VÀ VIẾT THÊM. 
+Tuyệt đối KHÔNG ĐƯỢC TÓM TẮT hay LƯỢC BỎ bất kỳ chi tiết nào. 
+Mục tiêu của bạn là VẮT KIỆT 100% dữ liệu. Trả về status "CONTINUE" nếu vẫn còn nội dung cần viết. 
+Chỉ trả về "DONE" khi bạn chắc chắn không còn một từ nào có thể viết thêm được nữa.`;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COPILOT CONTEXT
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface CopilotContext {
+  mode: WorldbuildingMode;
+  card: CharacterCardV3;
+  profile: ProxyProfile;
+  generationParams: GenerationParams;
+  chatHistory: ChatMessage[];
+  contextChip: string;
+  autoApply: boolean;
+  safeMode?: boolean; // Nếu true, từ chối update/delete entry
+  documentChunks?: string[];
+
+  // Callbacks
+  paused: boolean;
+  stopped: boolean;
+  setStatus: (status: string | null) => void;
+  appendMessage: (msg: CopilotMessage) => void;
+  showThought: (thought: string) => void;
+  showActionCard: (action: AIAction) => Promise<'apply' | 'skip'>;
+  applyAction: (action: AIAction) => void;
+  getCard: () => CharacterCardV3;
+}
+
+const MAX_LOOPS = 15;
+
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MAIN LOOP
+// ═══════════════════════════════════════════════════════════════════════════
+
+export async function runCopilotLoop(userMessage: string, ctx: CopilotContext): Promise<void> {
+  const isPipelineMode = ctx.mode === 'genesis' || ctx.mode === 'evolution' || ctx.mode === 'document_extraction';
+  const systemPrompt = buildCopilotSystemPrompt(ctx.mode, ctx.getCard(), ctx.contextChip) + 
+    (isPipelineMode ? '\n\n' + CRITICAL_ABSOLUTE_COMPLETENESS_PROTOCOL : '');
+
+  const messages: ChatMessage[] = [
+    { role: 'system', content: systemPrompt },
+    ...ctx.chatHistory,
+    { role: 'user', content: userMessage },
+  ];
+
+  let keepRunning = true;
+  let loopCount = 0;
+
+  while (keepRunning && loopCount < MAX_LOOPS && !ctx.stopped) {
+    while (ctx.paused) await sleep(300);
+    loopCount++;
+    ctx.setStatus(`Đang gọi AI (lượt ${loopCount})...`);
+
+    let response: AIResponse;
+    let rawResult: { text: string; finishReason?: string } | undefined;
+    try {
+      rawResult = await callAI({
+        profile: ctx.profile,
+        params: ctx.generationParams,
+        messages,
+      });
+      response = parseAIResponseJSON(rawResult.text);
+    } catch (err) {
+      if (rawResult && (rawResult.finishReason === 'length' || rawResult.finishReason === 'MAX_TOKENS')) {
+        response = {
+          message: rawResult.text + '\n\n*(Nội dung bị ngắt dở do giới hạn token. Hệ thống đang tự động yêu cầu viết tiếp...)*',
+          thought: '',
+          actions: [],
+          status: 'CONTINUE'
+        };
+      } else {
+        ctx.appendMessage({
+          id: Date.now().toString(),
+          role: 'system',
+          content: `❌ Lỗi gọi AI: ${err instanceof Error ? err.message : String(err)}`,
+          timestamp: Date.now(),
+        });
+        break;
+      }
+    }
+
+    // Show thought
+    if (response.thought) {
+      ctx.showThought(response.thought);
+    }
+
+    // Handle actions
+    for (const action of response.actions) {
+      if (ctx.stopped) break;
+      await handleAction(action, ctx, messages);
+    }
+
+    // Show message
+    if (response.message) {
+      ctx.appendMessage({
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: response.message,
+        thought: response.thought,
+        actions: response.actions,
+        timestamp: Date.now(),
+      });
+    }
+
+    // Handle auto-continue if cut off
+    if (rawResult && (rawResult.finishReason === 'length' || rawResult.finishReason === 'MAX_TOKENS')) {
+      messages.push({
+        role: 'assistant',
+        content: rawResult.text
+      });
+      messages.push({
+        role: 'user',
+        content: 'Vui lòng tiếp tục đoạn văn bản bị ngắt dở ở trên (không cần giải thích, chỉ viết tiếp tục).'
+      });
+      keepRunning = true;
+      continue;
+    }
+
+    // Check if we should continue
+    const hasPending = response.actions.some(a =>
+      ['fetch_fandom_data', 'read_document', 'continue_signal'].includes(a.type)
+    );
+    keepRunning = response.status === 'CONTINUE' || hasPending;
+
+    if (loopCount >= MAX_LOOPS && keepRunning) {
+      ctx.appendMessage({
+        id: Date.now().toString(),
+        role: 'system',
+        content: '⚠️ AI lặp quá nhiều bước. Thử lại với yêu cầu cụ thể hơn.',
+        timestamp: Date.now(),
+      });
+    }
+  }
+
+  ctx.setStatus(null);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ACTION HANDLER
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function handleAction(
+  action: AIAction,
+  ctx: CopilotContext,
+  messages: ChatMessage[],
+): Promise<void> {
+  switch (action.type) {
+    case 'fetch_fandom_data': {
+      ctx.setStatus(`🌐 Tải: ${action.data.url}`);
+      // This would call fetchWikiPageWithFallback in a real implementation
+      // For now, add a system message indicating the action
+      messages.push({
+        role: 'user',
+        content: `[System: fetch_fandom_data requested for "${action.data.url}". User cần copy nội dung vào tab Doc Extract.]`,
+      });
+      break;
+    }
+
+    case 'read_document': {
+      const chunk = ctx.documentChunks?.[action.data.chunk_index] ?? '';
+      const isLast = action.data.chunk_index >= (ctx.documentChunks?.length ?? 0) - 1;
+      messages.push({
+        role: 'user',
+        content: isLast
+          ? `[System: Chunk ${action.data.chunk_index + 1}/${ctx.documentChunks?.length}:\n${chunk}\n[END OF DOCUMENT]]`
+          : `[System: Chunk ${action.data.chunk_index + 1}/${ctx.documentChunks?.length}:\n${chunk}]`,
+      });
+      break;
+    }
+
+    case 'continue_signal': {
+      // Just continue the loop
+      break;
+    }
+
+    default: {
+      if (action.type === 'tool_call') {
+        const { tool, args } = action.data as { tool: string; args: Record<string, unknown> };
+        const toolDef = toolsEngine[tool];
+        if (!toolDef) {
+          messages.push({ role: 'user', content: `[System: Tool "${tool}" không tồn tại.]` });
+        } else {
+          ctx.setStatus(`🛠 Đang chạy tool: ${tool}...`);
+          try {
+            const result = await toolDef.execute(args, ctx);
+            messages.push({ role: 'user', content: `[System Tool Result: ${tool}]\n${result}` });
+          } catch (e) {
+            messages.push({ role: 'user', content: `[System Tool Error: ${tool}]\n${e instanceof Error ? e.message : String(e)}` });
+          }
+        }
+        return;
+      }
+
+      // create/update/delete/update_field/add_regex/update_regex/delete_regex/set_variable
+      const isDestructive = action.type.startsWith('delete');
+      const autoApply = ctx.autoApply && !isDestructive;
+
+      if (autoApply) {
+        ctx.applyAction(action);
+        messages.push({ role: 'user', content: `[System: Action "${action.type}" applied successfully.]` });
+      } else {
+        const decision = await ctx.showActionCard(action);
+        if (decision === 'apply') {
+          ctx.applyAction(action);
+          messages.push({ role: 'user', content: `[System: Action "${action.type}" applied by user.]` });
+        } else {
+          messages.push({ role: 'user', content: `[System: Action "${action.type}" skipped by user.]` });
+        }
+      }
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// APPLY ACTION TO CARD
+// ═══════════════════════════════════════════════════════════════════════════
+
+export function executeAction(
+  action: AIAction,
+  card: CharacterCardV3,
+  addEntry: (entry: LorebookEntry) => void,
+  updateEntry: (id: number, patch: Partial<LorebookEntry>) => void,
+  deleteEntry: (id: number) => void,
+  updateField: (path: string, value: unknown) => void,
+  safeMode: boolean = false
+): void {
+  const entries = card.data.character_book?.entries ?? [];
+  // Build lookup Set for duplicate check (O(1))
+  const existingComments = new Set(entries.map(e => e.comment.trim().toLowerCase()));
+
+  switch (action.type) {
+    case 'create_entry': {
+      // Duplicate check
+      const newComment = (action.data.comment || '').trim().toLowerCase();
+      if (existingComments.has(newComment)) {
+        console.warn(`[SafeMode] Bỏ qua tạo entry trùng lặp: ${action.data.comment}`);
+        break;
+      }
+
+      const id = nextEntryId(entries);
+      // Force recursion prevention
+      const patch = {
+        ...action.data,
+        prevent_recursion: true,
+        exclude_recursion: true
+      };
+      const entry = materializeEntry(patch, {}, id);
+      addEntry(entry);
+      break;
+    }
+    case 'update_entry': {
+      if (safeMode) {
+        console.warn(`[SafeMode] Từ chối update entry ${action.data.id}`);
+        break;
+      }
+      updateEntry(action.data.id, action.data.patch as Partial<LorebookEntry>);
+      break;
+    }
+    case 'delete_entry': {
+      if (safeMode) {
+        console.warn(`[SafeMode] Từ chối delete entry ${action.data.id}`);
+        break;
+      }
+      deleteEntry(action.data.id);
+      break;
+    }
+    case 'update_field': {
+      updateField(action.data.path, action.data.value);
+      break;
+    }
+    // Other action types handled by specific modules
+  }
+}
