@@ -24,3 +24,5 @@ export type {
   GameFrontendConfig, GameComponentType, OpeningFormConfig, OpeningFormField,
   MVUZODStudioTab, MVUZODStudioState,
 } from './mvuzod.types';
+export * from './autoCreator.types';
+

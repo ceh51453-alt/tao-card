@@ -7,7 +7,7 @@ import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Settings, FileText, BookOpen, Puzzle, Wrench, ScrollText,
-  Plus, Trash2,
+  Plus, Trash2, Wand2
 } from 'lucide-react';
 import { useCardStore } from '../../store/cardStore';
 import { cn } from '../../lib/utils';
@@ -17,6 +17,7 @@ interface SidebarProps {
 }
 
 const NAV_ITEMS = [
+  { path: '/auto-creator', icon: Wand2, label: 'Auto Creator', emoji: '🪄' },
   { path: '/settings', icon: Settings, label: 'Cài đặt', emoji: '⚙' },
   { path: '/editor', icon: FileText, label: 'Card Editor', emoji: '📝' },
   { path: '/lorebook', icon: BookOpen, label: 'Lorebook', emoji: '📚' },

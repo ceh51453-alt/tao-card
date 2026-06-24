@@ -14,7 +14,6 @@
  */
 
 import type { CharacterCardV3 } from '../../types/card.types';
-import type { LorebookEntry } from '../../types/lorebook.types';
 import type { RegexScript } from '../../types/regex.types';
 import type { MVUZODSchema } from '../../types/mvuzod.types';
 import { syncMirrorFields } from '../converters/cardDefaults';
@@ -221,24 +220,24 @@ export async function packageCard(
     const newScripts = [...existingScripts];
 
     if (!scriptNames.has(mvuImport.name)) {
-      newScripts.push(mvuImport);
+      newScripts.push(mvuImport as any);
       injections.push('Script: MVU Import script injected');
     }
 
     // Replace or add schema script
     const schemaIdx = newScripts.findIndex(s => s.name.startsWith('Cấu trúc biến'));
     if (schemaIdx >= 0) {
-      newScripts[schemaIdx] = schemaScript;
+      newScripts[schemaIdx] = schemaScript as any;
       injections.push('Script: Schema script updated');
     } else {
-      newScripts.push(schemaScript);
+      newScripts.push(schemaScript as any);
       injections.push('Script: Schema script injected');
     }
 
     if (!exportCard.data.extensions.tavern_helper) {
       exportCard.data.extensions.tavern_helper = { scripts: [], variables: {} };
     }
-    exportCard.data.extensions.tavern_helper.scripts = newScripts;
+    exportCard.data.extensions.tavern_helper.scripts = newScripts as any;
   }
 
   // ─── Step 4: Sync Mirror Fields ───────────────────────────────────────
@@ -339,7 +338,7 @@ function mergeRegexPatterns(
         findRegex: gen.findRegex,
         replaceString: gen.replaceString,
         trimStrings: [],
-        placement: [gen.scope === 'ai_output' ? 1 : gen.scope === 'user_input' ? 0 : 1],
+        placement: [gen.scope === 'ai_output' ? 1 : gen.scope === 'user_input' ? 0 : 1] as any,
         disabled: false,
         markdownOnly: false,
         promptOnly: false,

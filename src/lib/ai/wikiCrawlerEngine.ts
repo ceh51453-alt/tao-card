@@ -743,9 +743,7 @@ export async function fetchWikiNavigation(apiUrl: string, domain: string): Promi
   for (const pageName of pagesToTry) {
     try {
       const endpoint = `${apiUrl}?action=parse&page=${encodeURIComponent(pageName)}&format=json&prop=text&origin=*`;
-      const response = await fetchWithTimeout(endpoint, {}, 15000);
-      if (!response.ok) continue;
-      const data = await response.json();
+      const data = await fetchWithProxyRotation(endpoint);
       if (data.error) continue;
       const rawHtml = data.parse.text?.['*'] || '';
       if (rawHtml) {
@@ -1114,7 +1112,7 @@ async function fetchWithProxyRotation(originalUrl: string): Promise<any> {
   throw lastError || new Error("Failed to fetch via all proxy rotators.");
 }
 
-async function fetchHtmlWithProxyRotation(originalUrl: string): Promise<string> {
+export async function fetchHtmlWithProxyRotation(originalUrl: string): Promise<string> {
   const proxyFactories = [
     // 0. Local CORS proxy (Vite dev server)
     (url: string) => `/cors-proxy?url=${encodeURIComponent(url)}`,

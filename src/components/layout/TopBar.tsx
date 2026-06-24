@@ -6,7 +6,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Menu, Upload, Download, Undo2, Moon, Sun, ChevronDown,
-  FileJson, BookOpen, FileText, AlertCircle, Check, Image, Plus, Folder, Shield, LayoutGrid, Eraser
+  FileJson, BookOpen, FileText, AlertCircle, Check, Image, Plus, Folder, Shield, LayoutGrid, Eraser, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { useCardStore } from '../../store/cardStore';
 import { importCard, exportCardV3, exportStandaloneLorebook, exportCharacterOnly } from '../../lib/converters/lorebookConvert';
@@ -39,6 +39,29 @@ export function TopBar({ onToggleSidebar }: TopBarProps) {
   const [showExportWizard, setShowExportWizard] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+
+  // App Updater
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const handleAppUpdate = async (type: 'upgrade' | 'downgrade') => {
+    if (!confirm(type === 'upgrade' ? 'Bạn có muốn kéo (pull) phiên bản mới nhất từ GitHub?' : 'Bạn có muốn lùi (reset) về phiên bản trước đó 1 commit?')) return;
+    
+    setIsUpdating(true);
+    try {
+      const res = await fetch(`/api/app/${type}`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        alert('Thành công!\n\n' + data.message);
+        window.location.reload();
+      } else {
+        alert('Lỗi:\n\n' + data.error);
+      }
+    } catch (err) {
+      alert('Không thể kết nối đến server nội bộ. Vui lòng đảm bảo bạn đang chạy Vite server.\nLỗi: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   // Export dropdown
   const [showExport, setShowExport] = useState(false);
@@ -403,6 +426,20 @@ export function TopBar({ onToggleSidebar }: TopBarProps) {
         aria-label="Clear All Data" title="Xóa toàn bộ dữ liệu">
         <Eraser className="w-4 h-4" />
       </button>
+
+      {/* App Updater */}
+      <div className="flex items-center gap-1 border-l border-border pl-2 ml-1">
+        <button onClick={() => handleAppUpdate('upgrade')} disabled={isUpdating}
+          className="p-1.5 rounded-md hover:bg-accent transition-colors text-muted-foreground hover:text-emerald-500 disabled:opacity-50"
+          aria-label="Cập nhật (GitHub)" title="Cập nhật (GitHub pull)">
+          <ArrowUp className="w-4 h-4" />
+        </button>
+        <button onClick={() => handleAppUpdate('downgrade')} disabled={isUpdating}
+          className="p-1.5 rounded-md hover:bg-accent transition-colors text-muted-foreground hover:text-rose-500 disabled:opacity-50"
+          aria-label="Hạ bản (GitHub)" title="Hạ bản 1 commit (GitHub reset)">
+          <ArrowDown className="w-4 h-4" />
+        </button>
+      </div>
 
       {/* Theme toggle */}
       <button onClick={toggleTheme}

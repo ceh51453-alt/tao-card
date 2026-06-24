@@ -7,7 +7,7 @@ import { useState, useCallback, useMemo } from 'react';
 import {
   FileText, User, MessageSquare, Terminal, Puzzle,
   Plus, Trash2, GripVertical, Star, StarOff, Hash,
-  X, ChevronDown, ChevronRight, Copy,
+  X, ChevronDown, ChevronUp, ChevronRight, Copy,
 } from 'lucide-react';
 import { useCardStore } from '../store/cardStore';
 
@@ -152,9 +152,40 @@ function TabBasic({ data, updateField }: TabProps) {
         </FieldRow>
 
         <FieldRow label="Phiên bản">
-          <input type="text" value={data.character_version}
-            onChange={e => updateField('data.character_version', e.target.value)}
-            className="settings-input" placeholder="1.0" />
+          <div className="flex items-center gap-2">
+            <input type="text" value={data.character_version}
+              onChange={e => updateField('data.character_version', e.target.value)}
+              className="settings-input" placeholder="1.0" />
+            <button
+              onClick={() => {
+                const current = data.character_version || '1.0';
+                const match = current.match(/^(.*?)(\d+)(\D*)$/);
+                if (match) {
+                  updateField('data.character_version', `${match[1]}${parseInt(match[2], 10) + 1}${match[3]}`);
+                } else {
+                  updateField('data.character_version', current + ' 1');
+                }
+              }}
+              className="p-1.5 bg-slate-800 hover:bg-slate-700 border border-white/10 rounded text-gray-400 hover:text-white transition-colors"
+              title="Nâng phiên bản (+1)"
+            >
+              <ChevronUp size={16} />
+            </button>
+            <button
+              onClick={() => {
+                const current = data.character_version || '1.0';
+                const match = current.match(/^(.*?)(\d+)(\D*)$/);
+                if (match) {
+                  const num = Math.max(0, parseInt(match[2], 10) - 1);
+                  updateField('data.character_version', `${match[1]}${num}${match[3]}`);
+                }
+              }}
+              className="p-1.5 bg-slate-800 hover:bg-slate-700 border border-white/10 rounded text-gray-400 hover:text-white transition-colors"
+              title="Hạ phiên bản (-1)"
+            >
+              <ChevronDown size={16} />
+            </button>
+          </div>
         </FieldRow>
 
         <FieldRow label="Tags">

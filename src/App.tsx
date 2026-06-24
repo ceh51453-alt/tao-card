@@ -11,6 +11,7 @@ const RegexLabPage = lazy(() => import('./pages/RegexLabPage').then(m => ({ defa
 const MVUZODPage = lazy(() => import('./pages/MVUZODPage').then(m => ({ default: m.MVUZODPage })));
 const EJSStudioPage = lazy(() => import('./pages/EJSStudioPage').then(m => ({ default: m.EJSStudioPage })));
 const WikiPage = lazy(() => import('./pages/WikiPage').then(m => ({ default: m.WikiPage })));
+const AutoCreatorPage = lazy(() => import('./pages/AutoCreatorPage').then(m => ({ default: m.AutoCreatorPage })));
 
 function AppInit() {
   const { createNewProject, loadProject, refreshProjectList } = useCardStore();
@@ -37,6 +38,7 @@ export default function App() {
       <AppInit />
       <Routes>
         <Route element={<AppShell />}>
+          <Route path="/auto-creator" element={<AutoCreatorPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/editor" element={<CardEditorPage />} />
           <Route path="/lorebook" element={<LorebookPage />} />

@@ -16,7 +16,7 @@ import type { CompletionCriteria, VerificationReport } from '../../lib/completio
 import { DEFAULT_CRITERIA } from '../../lib/completionVerifier/criteria';
 import { runWithVerification } from '../../lib/completionVerifier/verifier';
 import {
-  ENTRY_CATEGORY_LABELS, getPreset, getStrategyLabel,
+  getPreset, getStrategyLabel,
   type EntryCategory, type CardType,
 } from '../../lib/worldbook/worldbookConfig';
 
@@ -26,12 +26,36 @@ const POSITION_LABELS: Record<number, string> = {
 };
 
 export function BatchGeneratorPanel() {
-  const card = useCardStore(s => s.card);
   const addEntry = useCardStore(s => s.addEntry);
   const settings = useSettingsStore();
 
   // ─── Config state ───────────────────────────────────────────────────
-  const [topicPrompt, setTopicPrompt] = useState('');
+  type TabKey = 'main_char' | 'multi_char' | 'worldview' | 'region' | 'scene' | 'secondary' | 'custom';
+
+  interface TabData {
+    id: TabKey;
+    label: string;
+    icon: string;
+    cardType: CardType;
+    category: EntryCategory;
+    placeholder: string;
+  }
+
+  const TABS: TabData[] = useMemo(() => [
+    { id: 'main_char', label: 'Nhân vật chính', icon: '👑', cardType: 'single', category: 'character_detail', placeholder: 'Ví dụ: Tạo một nam chính lạnh lùng, sử dụng kiếm thuật hệ băng, mang trong mình dòng máu ma tộc...' },
+    { id: 'multi_char', label: 'Nhân vật phụ (NPC)', icon: '👥', cardType: 'multi', category: 'npc', placeholder: 'Ví dụ: Tạo 5 thành viên của nhóm lính đánh thuê Hắc Vũ, bao gồm cung thủ, pháp sư, đấu sĩ...' },
+    { id: 'worldview', label: 'Thế giới quan', icon: '🌍', cardType: 'single', category: 'worldview', placeholder: 'Ví dụ: Mô tả thế giới tu tiên hiện đại, nơi linh khí khô kiệt và con người dùng máy móc để tu luyện...' },
+    { id: 'region', label: 'Địa lý & Khu vực', icon: '🗺', cardType: 'single', category: 'region_overview', placeholder: 'Ví dụ: Tạo các khu vực trong tông môn như Tàng Kinh Các, Dược Viên, Ngoại Môn, Nội Môn...' },
+    { id: 'scene', label: 'Cảnh vật & Sự kiện', icon: '🏞', cardType: 'single', category: 'scene', placeholder: 'Ví dụ: Sự kiện Đại hội Tỉ võ 10 năm một lần hoặc cảnh Thung lũng sương mù...' },
+    { id: 'secondary', label: 'Chỉ đạo AI (D0)', icon: '🎯', cardType: 'single', category: 'secondary_explanation', placeholder: 'Ví dụ: Căn dặn AI luôn viết văn phong kiếm hiệp cổ trang và tập trung mô tả nội tâm...' },
+    { id: 'custom', label: 'Tuỳ chỉnh tự do', icon: '⚙️', cardType: 'single', category: 'custom', placeholder: 'Nhập nội dung bất kỳ bạn muốn tạo...' },
+  ], []);
+
+  const [activeTab, setActiveTab] = useState<TabKey>('main_char');
+  const [prompts, setPrompts] = useState<Record<TabKey, string>>({
+    main_char: '', multi_char: '', worldview: '', region: '', scene: '', secondary: '', custom: ''
+  });
+
   const [useCardContext, setUseCardContext] = useState(true);
   const [useWebSearch, setUseWebSearch] = useState(false);
   const [totalEntries, setTotalEntries] = useState(10);
@@ -44,8 +68,6 @@ export function BatchGeneratorPanel() {
   const [maxRetries, setMaxRetries] = useState(2);
   const [maxConsecErrors, setMaxConsecErrors] = useState(3);
   const [modelOverride, setModelOverride] = useState('');
-  const [entryCategory, setEntryCategory] = useState<EntryCategory>('custom');
-  const [cardType, setCardType] = useState<CardType>('single');
 
   // ─── Run state ──────────────────────────────────────────────────────
   const [isRunning, setIsRunning] = useState(false);
@@ -75,13 +97,18 @@ export function BatchGeneratorPanel() {
 
   // ─── Handlers ───────────────────────────────────────────────────────
 
-  const handleStart = useCallback(async () => {
+  const handleStart = useCallback(async (runAll: boolean) => {
     if (!activeProfile) {
       addLog('❌ Chưa cấu hình proxy profile. Vào Settings để tạo.');
       return;
     }
-    if (!topicPrompt.trim()) {
-      addLog('❌ Nhập chủ đề / yêu cầu nội dung trước.');
+
+    const tabsToRun = runAll
+      ? TABS.filter(t => prompts[t.id].trim().length > 0)
+      : [TABS.find(t => t.id === activeTab)!].filter(t => prompts[t.id].trim().length > 0);
+
+    if (tabsToRun.length === 0) {
+      addLog('❌ Nhập chủ đề / yêu cầu nội dung vào tab trước khi chạy.');
       return;
     }
 
@@ -90,59 +117,69 @@ export function BatchGeneratorPanel() {
     setLogs([]);
     ctxRef.current = { paused: false, stopped: false };
 
-    const config: BatchGenConfig = {
-      topicPrompt: topicPrompt.trim(),
-      useCardContext,
-      useWebSearch,
-      totalEntries,
-      entriesPerBatch,
-      defaultPosition,
-      insertionOrderMode,
-      insertionOrderStart,
-      maxRetriesPerBatch: maxRetries,
-      maxConsecutiveErrors: maxConsecErrors,
-      modelOverride: modelOverride || undefined,
-      concurrentBatches,
-      category: entryCategory !== 'custom' ? entryCategory : undefined,
-      cardType,
-    };
-
     try {
-      await runBatchGeneration(config, {
-        card: structuredClone(card),
-        profile: activeProfile,
-        generationParams: settings.generationParams,
-        get paused() { return ctxRef.current.paused; },
-        get stopped() { return ctxRef.current.stopped; },
-        log: addLog,
-        onProgress: setProgress,
-        appendEntry: (entry) => { addEntry(entry); },
-      });
+      for (let i = 0; i < tabsToRun.length; i++) {
+        if (ctxRef.current.stopped) break;
+        
+        const tab = tabsToRun[i];
+        if (tabsToRun.length > 1) {
+          addLog(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n🚀 Đang chạy tab: ${tab.label} (${i + 1}/${tabsToRun.length})...\n━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+        }
+        
+        const config: BatchGenConfig = {
+          topicPrompt: prompts[tab.id].trim(),
+          useCardContext,
+          useWebSearch,
+          totalEntries,
+          entriesPerBatch,
+          defaultPosition,
+          insertionOrderMode,
+          insertionOrderStart,
+          maxRetriesPerBatch: maxRetries,
+          maxConsecutiveErrors: maxConsecErrors,
+          modelOverride: modelOverride || undefined,
+          concurrentBatches,
+          category: tab.category !== 'custom' ? tab.category : undefined,
+          cardType: tab.cardType,
+        };
 
-      // Run verification after batch if enabled
-      if (criteria.enabled && !ctxRef.current.stopped) {
-        setIsVerifying(true);
-        addLog('\n🎯 Bắt đầu Completion Verification...');
-        const report = await runWithVerification(config, criteria, {
+        await runBatchGeneration(config, {
           card: structuredClone(useCardStore.getState().card),
           profile: activeProfile,
           generationParams: settings.generationParams,
+          get paused() { return ctxRef.current.paused; },
           get stopped() { return ctxRef.current.stopped; },
           log: addLog,
-          onReport: setVerifyReport,
+          onProgress: setProgress,
           appendEntry: (entry) => { addEntry(entry); },
         });
-        setVerifyReport(report);
-        setIsVerifying(false);
+
+        // Run verification after batch if enabled
+        if (criteria.enabled && !ctxRef.current.stopped) {
+          setIsVerifying(true);
+          addLog(`\n🎯 Bắt đầu Completion Verification cho tab: ${tab.label}...`);
+          const report = await runWithVerification(config, criteria, {
+            card: structuredClone(useCardStore.getState().card),
+            profile: activeProfile,
+            generationParams: settings.generationParams,
+            get stopped() { return ctxRef.current.stopped; },
+            log: addLog,
+            onReport: setVerifyReport,
+            appendEntry: (entry) => { addEntry(entry); },
+          });
+          setVerifyReport(report);
+          setIsVerifying(false);
+        }
       }
     } catch (err) {
       addLog(`💥 Lỗi nghiêm trọng: ${err instanceof Error ? err.message : String(err)}`);
     }
+    
     setIsRunning(false);
     setIsVerifying(false);
-  }, [activeProfile, topicPrompt, useCardContext, useWebSearch, totalEntries, entriesPerBatch, concurrentBatches,
+  }, [activeProfile, prompts, activeTab, TABS, useCardContext, useWebSearch, totalEntries, entriesPerBatch, concurrentBatches,
       defaultPosition, insertionOrderMode, insertionOrderStart, maxRetries,
-      maxConsecErrors, modelOverride, card, settings.generationParams, addEntry, addLog, criteria, entryCategory, cardType]);
+      maxConsecErrors, modelOverride, settings.generationParams, addEntry, addLog, criteria]);
 
   const handlePause = useCallback(() => {
     const next = !ctxRef.current.paused;
@@ -162,12 +199,64 @@ export function BatchGeneratorPanel() {
 
   return (
     <div className="space-y-5 p-5 max-w-2xl mx-auto">
-      {/* Topic prompt */}
-      <div>
-        <label className="settings-label">Chủ đề / Yêu cầu nội dung</label>
-        <textarea value={topicPrompt} onChange={e => setTopicPrompt(e.target.value)}
-          rows={4} className="settings-input text-sm resize-y" disabled={isRunning}
-          placeholder="Ví dụ: Tạo lorebook cho thế giới tu tiên, bao gồm: hệ cảnh giới, công pháp, vũ khí, tông phái, quái thú..." />
+      {/* Category Tabs */}
+      <div className="flex flex-col gap-2">
+        <label className="settings-label text-sm mb-1">Loại nội dung muốn tạo (Chọn Tab & Nhập ý tưởng)</label>
+        <div className="flex flex-wrap gap-2">
+          {TABS.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors flex items-center gap-1.5 ${
+                activeTab === tab.id
+                  ? 'bg-blue-600/20 border-blue-500 text-blue-400'
+                  : prompts[tab.id].trim()
+                    ? 'bg-emerald-600/10 border-emerald-500/50 text-emerald-400 opacity-80'
+                    : 'bg-muted border-transparent text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+              }`}
+              disabled={isRunning}
+            >
+              <span>{tab.icon}</span> {tab.label}
+              {prompts[tab.id].trim() && activeTab !== tab.id && <Check className="w-3 h-3 ml-1" />}
+            </button>
+          ))}
+        </div>
+
+        {/* Active Tab Textarea */}
+        <div className="bg-muted/10 border border-border rounded-xl p-4 space-y-3 mt-1">
+          <textarea
+            value={prompts[activeTab]}
+            onChange={e => setPrompts(p => ({ ...p, [activeTab]: e.target.value }))}
+            rows={4}
+            className="settings-input text-sm resize-y"
+            disabled={isRunning}
+            placeholder={TABS.find(t => t.id === activeTab)?.placeholder}
+          />
+          
+          {/* Preset Info */}
+          {(() => {
+            const tab = TABS.find(t => t.id === activeTab);
+            if (!tab || tab.category === 'custom') return null;
+            const preset = getPreset(tab.category, tab.cardType);
+            if (!preset) return null;
+            const s = getStrategyLabel(preset.defaults.constant, preset.defaults.selective);
+            return (
+              <div className="text-xs space-y-1 text-muted-foreground pt-2 border-t border-border/50">
+                <div className={`flex items-center gap-1.5 ${s.color}`}>
+                  <span>{s.icon}</span>
+                  <span className="font-medium">{s.label}</span>
+                </div>
+                <p className="text-[10px]">
+                  pos={preset.defaults.position === 0 ? 'before_char' : preset.defaults.position === 1 ? 'after_char' : `@D${preset.defaults.depth}`}
+                  {' · '}order={preset.defaults.insertion_order}
+                  {preset.defaults.scan_depth !== null && ` · scan=${preset.defaults.scan_depth}`}
+                  {' · '}đệ quy=✅
+                </p>
+                <p className="text-[10px] text-muted-foreground/60">Từ khóa: {preset.keywordHint}</p>
+              </div>
+            );
+          })()}
+        </div>
       </div>
 
       {/* Context toggles */}
@@ -210,55 +299,7 @@ export function BatchGeneratorPanel() {
           <> (<span className="text-foreground font-medium">{totalRounds}</span> vòng × {concurrentBatches} song song)</>)}
       </div>
 
-      {/* Entry Category Selector */}
-      <div className="rounded-xl border border-border/60 bg-muted/20 p-4 space-y-3">
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="settings-label">Loại thẻ</label>
-            <div className="flex gap-3">
-              <label className="flex items-center gap-1.5 text-xs cursor-pointer">
-                <input type="radio" name="bg-cardType" checked={cardType === 'single'}
-                  onChange={() => setCardType('single')} className="settings-checkbox" disabled={isRunning} />
-                Nhân vật đơn
-              </label>
-              <label className="flex items-center gap-1.5 text-xs cursor-pointer">
-                <input type="radio" name="bg-cardType" checked={cardType === 'multi'}
-                  onChange={() => setCardType('multi')} className="settings-checkbox" disabled={isRunning} />
-                Nhiều NV
-              </label>
-            </div>
-          </div>
-          <div>
-            <label className="settings-label">Loại Entry sẽ tạo</label>
-            <select value={entryCategory} onChange={e => setEntryCategory(e.target.value as EntryCategory)}
-              className="settings-input text-xs" disabled={isRunning}>
-              {Object.entries(ENTRY_CATEGORY_LABELS).map(([key, { label, icon }]) => (
-                <option key={key} value={key}>{icon} {label}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-        {entryCategory !== 'custom' && (() => {
-          const preset = getPreset(entryCategory, cardType);
-          if (!preset) return null;
-          const s = getStrategyLabel(preset.defaults.constant, preset.defaults.selective);
-          return (
-            <div className="text-xs space-y-1 text-muted-foreground">
-              <div className={`flex items-center gap-1.5 ${s.color}`}>
-                <span>{s.icon}</span>
-                <span className="font-medium">{s.label}</span>
-              </div>
-              <p className="text-[10px]">
-                pos={preset.defaults.position === 0 ? 'before_char' : preset.defaults.position === 1 ? 'after_char' : `@D${preset.defaults.depth}`}
-                {' · '}order={preset.defaults.insertion_order}
-                {preset.defaults.scan_depth !== null && ` · scan=${preset.defaults.scan_depth}`}
-                {' · '}đệ quy=✅
-              </p>
-              <p className="text-[10px] text-muted-foreground/60">Từ khóa: {preset.keywordHint}</p>
-            </div>
-          );
-        })()}
-      </div>
+
 
       {/* Position */}
       <div>
@@ -333,10 +374,16 @@ export function BatchGeneratorPanel() {
       {/* Control buttons */}
       <div className="flex gap-2">
         {!isRunning ? (
-          <button onClick={handleStart}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 transition-colors">
-            <Zap className="w-4 h-4" /> 🚀 Bắt đầu sinh
-          </button>
+          <>
+            <button onClick={() => handleStart(false)}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/50 font-medium text-sm hover:bg-blue-600/30 transition-colors">
+              <Play className="w-4 h-4" /> Chạy Tab Hiện Tại
+            </button>
+            <button onClick={() => handleStart(true)}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 transition-colors">
+              <Zap className="w-4 h-4" /> 🚀 Chạy Tất Cả Tab Đã Nhập
+            </button>
+          </>
         ) : (
           <>
             <button onClick={handlePause}

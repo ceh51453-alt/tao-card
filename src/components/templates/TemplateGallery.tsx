@@ -63,7 +63,7 @@ export function TemplateGallery({ open, onClose }: TemplateGalleryProps) {
   }, [filter]);
 
   const handleApplyCard = useCallback((template: CardTemplate) => {
-    createSnapshot();
+    createSnapshot('Apply template');
     const newCard = applyCardTemplate(template, card);
     setCard(newCard);
     setApplied(template.id);
@@ -71,9 +71,9 @@ export function TemplateGallery({ open, onClose }: TemplateGalleryProps) {
   }, [card, setCard, createSnapshot]);
 
   const handleApplySchema = useCallback((template: MVUZODTemplate) => {
-    createSnapshot();
+    createSnapshot('Apply schema');
     const clone = structuredClone(card);
-    (clone.data.extensions as Record<string, unknown>).mvuzod = { schema: template.schema };
+    (clone.data.extensions as any).mvuzod = { schema: template.schema };
     setCard(clone);
     setApplied(template.id);
     setTimeout(() => setApplied(null), 2000);

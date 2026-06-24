@@ -1,12 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import React, { useState } from 'react';
-import { useCardStore } from '../../store/cardStore';
-import { parseWikiUrl, fetchWikiPage, fetchWikiNavigation, fetchFandomLocalNavigation, type WikiMenuItem, META_FILTERS, titleMatchesMeta, extractNavigationFromJsonInHtml, parseHtmlToMenuTree } from '../../lib/ai/wikiCrawlerEngine';
+import { useState } from 'react';
+import { parseWikiUrl, fetchWikiNavigation, fetchFandomLocalNavigation, type WikiMenuItem, META_FILTERS, titleMatchesMeta, extractNavigationFromJsonInHtml, parseHtmlToMenuTree, fetchHtmlWithProxyRotation } from '../../lib/ai/wikiCrawlerEngine';
 import { Search, Loader2, Play, CheckSquare, Square, ChevronRight, ChevronDown, ListTree, Filter } from 'lucide-react';
-import { Button } from '../ui/Button';
-
 export function WikiCollectorPanel() {
-  const { currentCard, addLorebookEntry } = useCardStore();
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [menuTree, setMenuTree] = useState<WikiMenuItem[]>([]);
@@ -35,13 +31,16 @@ export function WikiCollectorPanel() {
       
       // Fallback: fetch homepage and parse
       if (!tree.length) {
-        const homeRes = await fetch(`https://api.allorigins.win/raw?url=https://${parsed.domain}/`);
-        if (homeRes.ok) {
-          const html = await homeRes.text();
-          tree = extractNavigationFromJsonInHtml(html, parsed.domain);
-          if (!tree.length) {
-            tree = parseHtmlToMenuTree(html, parsed.domain);
+        try {
+          const html = await fetchHtmlWithProxyRotation(`https://${parsed.domain}/`);
+          if (html) {
+            tree = extractNavigationFromJsonInHtml(html, parsed.domain);
+            if (!tree.length) {
+              tree = parseHtmlToMenuTree(html, parsed.domain);
+            }
           }
+        } catch (e) {
+          console.warn("Fallback HTML crawl failed", e);
         }
       }
 
@@ -151,10 +150,10 @@ export function WikiCollectorPanel() {
             className="flex-1 bg-slate-900 border border-white/10 rounded px-3 py-1.5 text-sm text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             onKeyDown={e => e.key === 'Enter' && handleCrawlNav()}
           />
-          <Button onClick={handleCrawlNav} disabled={loading || !url} className="shrink-0 gap-2">
+          <button onClick={handleCrawlNav} disabled={loading || !url} className="shrink-0 gap-2 flex items-center bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-3 py-1.5 rounded">
             {loading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
             Duyệt Menu
-          </Button>
+          </button>
         </div>
       </div>
       
@@ -197,14 +196,13 @@ export function WikiCollectorPanel() {
           </div>
           
           <div className="mt-auto pt-4 border-t border-white/10">
-            <Button 
-              className="w-full justify-center gap-2" 
-              variant="primary"
+            <button 
+              className="w-full flex justify-center items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded"
               disabled={selectedUrls.size === 0}
             >
               <Play size={16} />
               Cào {selectedUrls.size} trang
-            </Button>
+            </button>
           </div>
         </div>
       </div>

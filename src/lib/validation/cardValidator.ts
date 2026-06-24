@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /**
  * src/lib/validation/cardValidator.ts — Comprehensive Card Validation
  *
@@ -13,8 +12,7 @@
  */
 
 import type { CharacterCardV3 } from '../../types/card.types';
-import type { LorebookEntry } from '../../types/lorebook.types';
-import type { RegexScript } from '../../types/regex.types';
+
 import type { MVUZODSchema, MVUZODField } from '../../types/mvuzod.types';
 import { isPreprocessingEntry, validateEJSEntry } from '../ejs/ejsParser';
 import { findExistingMVUZODEntries } from '../export/worldbookGenerator';

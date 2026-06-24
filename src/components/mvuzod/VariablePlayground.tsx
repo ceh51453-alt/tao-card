@@ -210,7 +210,7 @@ export function VariablePlayground({ schema }: { schema: MVUZODSchema | null }) 
             }
             break;
           default:
-            errors.push(`Op "${op.op}" không được hỗ trợ`);
+            errors.push(`Op "${(op as any).op}" không được hỗ trợ`);
         }
       }
     } catch (e) {

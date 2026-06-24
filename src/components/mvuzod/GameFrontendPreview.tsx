@@ -13,7 +13,7 @@ import { useState, useMemo, useCallback } from 'react';
 import {
   Gamepad2, Copy, Check, FileCode, Eye,
   LayoutGrid, FormInput, Monitor,
-  ChevronRight, Download, Sparkles,
+  ChevronRight, Sparkles,
 } from 'lucide-react';
 import type { MVUZODSchema, MVUZODField } from '../../types/mvuzod.types';
 

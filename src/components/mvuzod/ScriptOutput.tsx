@@ -11,10 +11,9 @@ import {
   Copy, Check, ChevronDown, ChevronRight, Eye, EyeOff,
   Download, AlertTriangle,
 } from 'lucide-react';
-import type { MVUZODSchema, MVUZODField, InitVarEntry } from '../../types/mvuzod.types';
+import type { MVUZODSchema, InitVarEntry } from '../../types/mvuzod.types';
 import {
   generateAllOutputs,
-  generateInitVarBlock,
   type AllGeneratedOutputs,
   type GeneratedRegex,
 } from '../../lib/mvuzod/scriptGenerator';
@@ -119,7 +118,7 @@ interface ScriptOutputProps {
   initVarEntries?: InitVarEntry[];
 }
 
-export function ScriptOutput({ schema, initVarValues, initVarEntries }: ScriptOutputProps) {
+export function ScriptOutput({ schema, initVarValues }: ScriptOutputProps) {
   const [activePanel, setActivePanel] = useState('schema');
   const [varListMode, setVarListMode] = useState<'full' | 'selective'>('full');
   const [copiedId, setCopiedId] = useState<string | null>(null);
