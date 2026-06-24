@@ -6,7 +6,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Menu, Upload, Download, Undo2, Moon, Sun, ChevronDown,
-  FileJson, BookOpen, FileText, AlertCircle, Check, Image, Plus, Folder, Shield, LayoutGrid, Eraser, ArrowUp, ArrowDown
+  FileJson, BookOpen, FileText, AlertCircle, Check, Image, Plus, Folder, Shield, LayoutGrid, Eraser, ArrowUp, ArrowDown,
+  HelpCircle
 } from 'lucide-react';
 import { useCardStore } from '../../store/cardStore';
 import { importCard, exportCardV3, exportStandaloneLorebook, exportCharacterOnly } from '../../lib/converters/lorebookConvert';
@@ -16,6 +17,7 @@ import { cn } from '../../lib/utils';
 import { ExportWizard } from '../export/ExportWizard';
 import { ValidationDashboard } from '../common/ValidationDashboard';
 import { TemplateGallery } from '../templates/TemplateGallery';
+import { UserGuideModal } from '../common/UserGuideModal';
 import { db } from '../../lib/db/db';
 
 interface TopBarProps {
@@ -39,6 +41,7 @@ export function TopBar({ onToggleSidebar }: TopBarProps) {
   const [showExportWizard, setShowExportWizard] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [showUserGuide, setShowUserGuide] = useState(false);
 
   // App Updater
   const [isUpdating, setIsUpdating] = useState(false);
@@ -441,6 +444,13 @@ export function TopBar({ onToggleSidebar }: TopBarProps) {
         </button>
       </div>
 
+      {/* Hướng dẫn sử dụng */}
+      <button onClick={() => setShowUserGuide(true)}
+        className="p-1.5 rounded-md hover:bg-accent transition-colors text-muted-foreground hover:text-primary"
+        aria-label="User Guide" title="Hướng dẫn sử dụng">
+        <HelpCircle className="w-4 h-4" />
+      </button>
+
       {/* Theme toggle */}
       <button onClick={toggleTheme}
         className="p-1.5 rounded-md hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
@@ -456,6 +466,9 @@ export function TopBar({ onToggleSidebar }: TopBarProps) {
 
       {/* Template Gallery Modal */}
       <TemplateGallery open={showTemplates} onClose={() => setShowTemplates(false)} />
+
+      {/* User Guide Modal */}
+      <UserGuideModal open={showUserGuide} onClose={() => setShowUserGuide(false)} />
     </header>
   );
 }

@@ -873,136 +873,247 @@ function ParamNumber({ label, value, onChange, min, max }: {
 
 // ─── Tavern Helper Settings ───────────────────────────────────────────────────
 
+import { useSyncStore } from '../store/syncStore';
+import { useCardStore } from '../store/cardStore';
+import type { SyncMode } from '../lib/sync/syncTypes';
+
+const MODE_TABS: { id: SyncMode; label: string; icon: string; desc: string }[] = [
+  { id: 'rest', label: 'REST API', icon: '🌐', desc: 'Kết nối trực tiếp ST API — không cần extension' },
+  { id: 'websocket', label: 'WebSocket', icon: '⚡', desc: 'Real-time sync qua extension WS' },
+  { id: 'plugin', label: 'Server Plugin', icon: '🔌', desc: 'Custom plugin endpoint' },
+];
+
 function TavernHelperSettings() {
-  const STORAGE_KEY = 'tavern_helper_settings';
+  const sync = useSyncStore();
+  const card = useCardStore(s => s.card);
+  const [showLog, setShowLog] = useState(false);
 
-  const getSettings = () => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return JSON.parse(raw) as { wsUrl: string; autoSync: boolean; cdnUrl: string };
-    } catch { /* ignore */ }
-    return {
-      wsUrl: 'ws://localhost:5001',
-      autoSync: false,
-      cdnUrl: 'https://testingcf.jsdelivr.net/gh/MagicalAstrogy/MagVarUpdate/artifact/bundle.js',
-    };
-  };
-
-  const [settings, setSettings] = useState(getSettings);
-  const [status, setStatus] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
-
-  const updateSettings = useCallback((patch: Partial<typeof settings>) => {
-    setSettings(prev => {
-      const next = { ...prev, ...patch };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      return next;
-    });
-  }, []);
-
-  const handleTestConnection = useCallback(async () => {
-    setStatus('connecting');
-    try {
-      const ws = new WebSocket(settings.wsUrl);
-      const timeout = setTimeout(() => {
-        ws.close();
-        setStatus('error');
-      }, 5000);
-
-      ws.onopen = () => {
-        clearTimeout(timeout);
-        setStatus('connected');
-        ws.close();
-        setTimeout(() => setStatus('idle'), 3000);
-      };
-
-      ws.onerror = () => {
-        clearTimeout(timeout);
-        setStatus('error');
-        setTimeout(() => setStatus('idle'), 3000);
-      };
-    } catch {
-      setStatus('error');
-      setTimeout(() => setStatus('idle'), 3000);
-    }
-  }, [settings.wsUrl]);
-
-  const statusIndicator = {
-    idle: 'bg-muted-foreground/30',
+  const statusColor: Record<string, string> = {
+    disconnected: 'bg-zinc-500/30',
     connecting: 'bg-amber-400 animate-pulse',
     connected: 'bg-emerald-400',
     error: 'bg-red-400',
   };
-
-  const statusText = {
-    idle: 'Chưa kết nối',
+  const statusLabel: Record<string, string> = {
+    disconnected: 'Chưa kết nối',
     connecting: 'Đang kết nối...',
-    connected: '✅ Kết nối thành công',
-    error: '❌ Không thể kết nối',
+    connected: '✅ Đã kết nối',
+    error: '❌ Lỗi kết nối',
+  };
+
+  const handleSync = async () => {
+    if (!card) return;
+    await sync.syncNow(card);
   };
 
   return (
-    <div className="space-y-4 p-4">
+    <div className="space-y-5 p-4">
       <p className="text-xs text-muted-foreground">
-        Cấu hình kết nối với SillyTavern qua Tavern Helper WebSocket để đồng bộ live.
+        Đồng bộ card với SillyTavern. Chọn phương thức kết nối phù hợp.
       </p>
 
-      {/* WebSocket URL */}
-      <div>
-        <label className="settings-label">WebSocket URL</label>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={settings.wsUrl}
-            onChange={e => updateSettings({ wsUrl: e.target.value })}
-            className="settings-input flex-1 text-sm font-mono"
-            placeholder="ws://localhost:5001"
-          />
+      {/* ─── Mode Tabs ─── */}
+      <div className="flex gap-1 p-1 rounded-lg bg-muted/30 border border-border/50">
+        {MODE_TABS.map(tab => (
           <button
-            onClick={handleTestConnection}
-            disabled={status === 'connecting'}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 shrink-0"
+            key={tab.id}
+            onClick={() => sync.updateSettings({ mode: tab.id })}
+            className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all ${
+              sync.settings.mode === tab.id
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+            }`}
           >
-            Test
+            <span className="mr-1">{tab.icon}</span>
+            {tab.label}
           </button>
-        </div>
-        {/* Status */}
-        <div className="flex items-center gap-1.5 mt-2">
-          <div className={`w-2 h-2 rounded-full ${statusIndicator[status]}`} />
-          <span className="text-[10px] text-muted-foreground">{statusText[status]}</span>
-        </div>
+        ))}
       </div>
 
-      {/* Auto-sync toggle */}
+      {/* Mode description */}
+      <div className="text-[10px] text-muted-foreground/70 px-1">
+        {MODE_TABS.find(t => t.id === sync.settings.mode)?.desc}
+      </div>
+
+      {/* ─── Mode Config ─── */}
+      <div className="space-y-3">
+        {sync.settings.mode === 'rest' && (
+          <div>
+            <label className="settings-label">SillyTavern URL</label>
+            <input
+              type="text"
+              value={sync.settings.stBaseUrl}
+              onChange={e => sync.updateSettings({ stBaseUrl: e.target.value })}
+              className="settings-input text-sm font-mono"
+              placeholder="http://localhost:8000"
+            />
+            <p className="text-[9px] text-muted-foreground mt-1">
+              URL gốc SillyTavern. Không cần extension — dùng API có sẵn.
+            </p>
+          </div>
+        )}
+
+        {sync.settings.mode === 'websocket' && (
+          <>
+            <div>
+              <label className="settings-label">WebSocket URL</label>
+              <input
+                type="text"
+                value={sync.settings.wsUrl}
+                onChange={e => sync.updateSettings({ wsUrl: e.target.value })}
+                className="settings-input text-sm font-mono"
+                placeholder="ws://localhost:5001"
+              />
+            </div>
+            <div className="flex items-center justify-between p-2 rounded-lg bg-muted/20 border border-border/50">
+              <span className="text-[11px]">Auto-reconnect</span>
+              <button
+                onClick={() => sync.updateSettings({ wsAutoReconnect: !sync.settings.wsAutoReconnect })}
+                className={`w-8 h-4.5 rounded-full transition-colors relative ${
+                  sync.settings.wsAutoReconnect ? 'bg-primary' : 'bg-muted-foreground/30'
+                }`}
+              >
+                <div className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white shadow-sm transition-transform ${
+                  sync.settings.wsAutoReconnect ? 'left-[14px]' : 'left-0.5'
+                }`} />
+              </button>
+            </div>
+          </>
+        )}
+
+        {sync.settings.mode === 'plugin' && (
+          <div>
+            <label className="settings-label">Plugin Endpoint</label>
+            <input
+              type="text"
+              value={sync.settings.pluginUrl}
+              onChange={e => sync.updateSettings({ pluginUrl: e.target.value })}
+              className="settings-input text-sm font-mono"
+              placeholder="http://localhost:8000/api/plugins/card-sync"
+            />
+            <p className="text-[9px] text-muted-foreground mt-1">
+              Cần cài plugin card-sync vào SillyTavern/plugins/
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* ─── Connection & Sync ─── */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => sync.status === 'connected' ? sync.disconnect() : sync.connect()}
+          className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+            sync.status === 'connected'
+              ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
+              : 'bg-primary/20 text-primary hover:bg-primary/30 border border-primary/30'
+          }`}
+        >
+          {sync.status === 'connecting' ? (
+            <><Loader2 className="w-3 h-3 animate-spin inline mr-1" />Đang kết nối...</>
+          ) : sync.status === 'connected' ? (
+            '⛔ Ngắt kết nối'
+          ) : (
+            '🔗 Kết nối'
+          )}
+        </button>
+
+        <button
+          onClick={handleSync}
+          disabled={sync.isSyncing || !card}
+          className="flex-1 px-3 py-2 rounded-lg text-xs font-medium bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30 transition-all disabled:opacity-40"
+        >
+          {sync.isSyncing ? (
+            <><Loader2 className="w-3 h-3 animate-spin inline mr-1" />Đang sync...</>
+          ) : (
+            '📤 Sync Now'
+          )}
+        </button>
+      </div>
+
+      {/* Status indicator */}
+      <div className="flex items-center gap-2">
+        <div className={`w-2 h-2 rounded-full ${statusColor[sync.status]}`} />
+        <span className="text-[11px] text-muted-foreground">{statusLabel[sync.status]}</span>
+        {sync.lastSync && (
+          <span className="text-[10px] text-muted-foreground/60 ml-auto">
+            {sync.lastSync.success ? '✅' : '❌'} {new Date(sync.lastSync.timestamp).toLocaleTimeString()}
+          </span>
+        )}
+      </div>
+
+      {/* ─── Auto-sync toggle ─── */}
       <div className="flex items-center justify-between p-3 rounded-lg bg-muted/20 border border-border/50">
         <div>
           <div className="text-xs font-medium">Auto-sync khi lưu</div>
-          <div className="text-[10px] text-muted-foreground">Tự động push card data qua WebSocket khi lưu</div>
+          <div className="text-[10px] text-muted-foreground">Tự động push card khi save</div>
         </div>
         <button
-          onClick={() => updateSettings({ autoSync: !settings.autoSync })}
+          onClick={() => sync.updateSettings({ autoSync: !sync.settings.autoSync })}
           className={`w-9 h-5 rounded-full transition-colors relative ${
-            settings.autoSync ? 'bg-primary' : 'bg-muted-foreground/30'
+            sync.settings.autoSync ? 'bg-primary' : 'bg-muted-foreground/30'
           }`}
         >
           <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${
-            settings.autoSync ? 'left-[18px]' : 'left-0.5'
+            sync.settings.autoSync ? 'left-[18px]' : 'left-0.5'
           }`} />
         </button>
       </div>
 
-      {/* CDN URL */}
+      {/* ─── CDN URL ─── */}
       <div>
         <label className="settings-label">MVU Bundle CDN URL</label>
         <input
           type="text"
-          value={settings.cdnUrl}
-          onChange={e => updateSettings({ cdnUrl: e.target.value })}
+          value={sync.settings.cdnUrl}
+          onChange={e => sync.updateSettings({ cdnUrl: e.target.value })}
           className="settings-input text-[10px] font-mono"
           placeholder="https://cdn.jsdelivr.net/..."
         />
         <p className="text-[9px] text-muted-foreground mt-1">
           URL của MVU bundle script. Sử dụng khi inject Tavern Helper scripts.
         </p>
+      </div>
+
+      {/* ─── Sync Log ─── */}
+      <div>
+        <button
+          onClick={() => setShowLog(!showLog)}
+          className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+        >
+          {showLog ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+          Sync Log ({sync.log.length})
+        </button>
+
+        {showLog && (
+          <div className="mt-2 max-h-40 overflow-y-auto scrollbar-thin rounded-lg bg-black/50 border border-border/30 p-2 space-y-0.5">
+            {sync.log.length === 0 ? (
+              <p className="text-[10px] text-muted-foreground/50 text-center py-2">Chưa có log</p>
+            ) : (
+              <>
+                {sync.log.map((event, i) => (
+                  <div key={i} className="text-[10px] font-mono flex gap-2">
+                    <span className="text-muted-foreground/50 shrink-0">
+                      {new Date(event.timestamp).toLocaleTimeString()}
+                    </span>
+                    <span className={
+                      event.type === 'error' ? 'text-red-400' :
+                      event.type === 'connected' || event.type === 'synced' ? 'text-emerald-400' :
+                      'text-zinc-400'
+                    }>
+                      {event.message}
+                    </span>
+                  </div>
+                ))}
+                <button
+                  onClick={() => sync.clearLog()}
+                  className="text-[9px] text-muted-foreground/50 hover:text-muted-foreground mt-1"
+                >
+                  Xóa log
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,0 +1,12 @@
+{
+  "display_name": "Card Sync",
+  "loading_order": 1,
+  "requires": [],
+  "optional": [],
+  "js": "index.js",
+  "css": "",
+  "author": "Tavern Card Studio",
+  "version": "1.0.0",
+  "homePage": "",
+  "auto_update": false
+}

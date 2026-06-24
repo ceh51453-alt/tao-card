@@ -8,6 +8,7 @@ import { create } from 'zustand';
 import type { StateCreator } from 'zustand';
 import type { CharacterCardV3, LorebookEntry, CardExtensions } from '../types';
 import type { MVUZODSchema } from '../types/mvuzod.types';
+import { tavernSync } from '../lib/sync/tavernSyncService';
 import { createEmptyCard, syncMirrorFields, nextEntryId } from '../lib/converters/cardDefaults';
 import * as repo from '../lib/db/projectRepo';
 
@@ -249,6 +250,12 @@ const createPersistenceSlice: StateCreator<CardState, [], [], PersistenceSlice> 
     await repo.saveProject(currentProjectId, synced);
     set({ isSaving: false, isDirty: false, lastSavedAt: Date.now(), card: synced });
     await get().refreshProjectList();
+
+    // Auto-sync to SillyTavern nếu bật
+    const syncSettings = tavernSync.getSettings();
+    if (syncSettings.autoSync) {
+      tavernSync.pushCard(synced).catch(() => { /* silent fail */ });
+    }
   },
 
   createSnapshot: async (label) => {
