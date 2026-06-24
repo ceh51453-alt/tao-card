@@ -3,14 +3,16 @@ import {
   Wand2, Play, Pause, Square, RotateCcw, Eye, Check,
   CheckCircle2, Circle, Loader2, ChevronRight, ChevronDown,
   AlertTriangle, Settings2, Hash, BookOpen, User, Terminal,
-  MessageSquare, Sparkles, SkipForward, Edit3, Zap,
+  MessageSquare, Sparkles, SkipForward, Edit3, Zap, Moon, Cog,
   type LucideIcon
 } from 'lucide-react';
 import { useAutoCreatorStore } from '../store/autoCreatorStore';
 import { useSettingsStore } from '../store/settingsStore';
 import { runAutoCreatorPipeline, retrySingleStep, skipStep, applyStepPreview } from '../lib/ai/autoCreatorPipeline';
+import { runMinhNguyetPipeline, retryMnStep, skipMnStep } from '../lib/ai/minhNguyetPipeline';
 import { AUTO_CREATOR_PRESETS } from '../lib/ai/autoCreatorPresets';
-import type { AutoCreatorStep } from '../types';
+import { MINH_NGUYET_STEP_LABELS } from '../prompts/minhNguyetTemplates';
+import type { AutoCreatorStep, MinhNguyetStep, AnyPipelineStep } from '../types';
 import { cn } from '../lib/utils';
 
 const STEP_DEFS: { id: AutoCreatorStep; label: string; icon: LucideIcon; desc: string }[] = [
@@ -27,8 +29,9 @@ export function AutoCreatorPage() {
   const store = useAutoCreatorStore();
   const settings = useSettingsStore();
   const activeProfile = settings.getActiveProfile();
+  const isMinhNguyet = store.config.pipelineMethod === 'minh_nguyet';
   
-  const [expandedStep, setExpandedStep] = useState<AutoCreatorStep | null>(null);
+  const [expandedStep, setExpandedStep] = useState<AnyPipelineStep | null>(null);
   const [showPromptOverride, setShowPromptOverride] = useState<AutoCreatorStep | null>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
 
@@ -41,13 +44,54 @@ export function AutoCreatorPage() {
     if (!store.config.idea.trim()) { alert('Vui lòng nhập ý tưởng card!'); return; }
     if (store.isPaused) { store.setPaused(false); return; }
     if (!store.isRunning && store.currentStep) { store.resetPipeline(); }
-    await runAutoCreatorPipeline({ profile: activeProfile, generationParams: settings.generationParams });
+    
+    if (isMinhNguyet) {
+      await runMinhNguyetPipeline({ profile: activeProfile, generationParams: settings.generationParams });
+    } else {
+      await runAutoCreatorPipeline({ profile: activeProfile, generationParams: settings.generationParams });
+    }
   };
 
   const handleRetry = async (step: AutoCreatorStep) => {
     if (!activeProfile) return;
     await retrySingleStep(step, { profile: activeProfile, generationParams: settings.generationParams });
   };
+
+  const handleMnRetry = async (step: MinhNguyetStep) => {
+    if (!activeProfile) return;
+    await retryMnStep(step, { profile: activeProfile, generationParams: settings.generationParams });
+  };
+
+  const renderMethodSelector = () => (
+    <div className="flex items-center gap-2 p-1 rounded-xl bg-muted/50 border border-border">
+      <button
+        className={cn(
+          'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all',
+          !isMinhNguyet
+            ? 'bg-background shadow-sm border border-border text-foreground'
+            : 'text-muted-foreground hover:text-foreground'
+        )}
+        onClick={() => store.setPipelineMethod('standard')}
+        disabled={store.isRunning}
+      >
+        <Cog className="w-3.5 h-3.5" />
+        Standard
+      </button>
+      <button
+        className={cn(
+          'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all',
+          isMinhNguyet
+            ? 'bg-gradient-to-r from-violet-500/10 to-blue-500/10 shadow-sm border border-violet-500/20 text-violet-400'
+            : 'text-muted-foreground hover:text-foreground'
+        )}
+        onClick={() => store.setPipelineMethod('minh_nguyet')}
+        disabled={store.isRunning}
+      >
+        <Moon className="w-3.5 h-3.5" />
+        Minh Nguyệt
+      </button>
+    </div>
+  );
 
   const renderPresetSelector = () => (
     <div className="space-y-2">
@@ -223,6 +267,7 @@ export function AutoCreatorPage() {
         </div>
 
         <div className="flex-1 overflow-y-auto scrollbar-thin p-4 space-y-5">
+          {renderMethodSelector()}
           {renderPresetSelector()}
 
           <div className="space-y-2">
@@ -240,10 +285,86 @@ export function AutoCreatorPage() {
             </button>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">☑️ CÁC BƯỚC TẠO CARD</label>
-            <div className="space-y-1.5">{STEP_DEFS.map(s => renderStepConfig(s.id))}</div>
-          </div>
+          {isMinhNguyet ? (
+            <>
+              {/* MN Config */}
+              <div className="space-y-3">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                  <Moon className="w-3.5 h-3.5" /> CẤU HÌNH MINH NGUYỆT
+                </label>
+                <div className="space-y-2 p-3 rounded-lg border bg-card text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Đường thế giới quan</span>
+                    <select
+                      className="border rounded px-2 py-1 bg-background text-xs"
+                      value={store.config.mnConfig.worldviewPath}
+                      onChange={(e) => store.updateMnConfig({ worldviewPath: e.target.value as 'real_background' | 'small_world' | 'large_world' })}
+                      disabled={store.isRunning}
+                    >
+                      <option value="real_background">Đường A: Bối cảnh thực</option>
+                      <option value="small_world">Đường B: Thế giới nhỏ</option>
+                      <option value="large_world">Đường C: Thế giới lớn</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Loại thẻ</span>
+                    <select
+                      className="border rounded px-2 py-1 bg-background text-xs"
+                      value={store.config.mnConfig.cardType}
+                      onChange={(e) => store.updateMnConfig({ cardType: e.target.value as 'single' | 'multi' })}
+                      disabled={store.isRunning}
+                    >
+                      <option value="single">Nhân vật đơn</option>
+                      <option value="multi">Nhiều nhân vật</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Auto Tag</span>
+                    <button
+                      className={cn('w-8 h-4 rounded-full transition-colors', store.config.mnConfig.autoTag ? 'bg-primary' : 'bg-muted')}
+                      onClick={() => store.updateMnConfig({ autoTag: !store.config.mnConfig.autoTag })}
+                      disabled={store.isRunning}
+                    >
+                      <div className={cn('w-3 h-3 rounded-full bg-white shadow transition-transform', store.config.mnConfig.autoTag ? 'translate-x-4' : 'translate-x-0.5')} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* MN Steps */}
+              <div className="space-y-2">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">🌙 CÁC BƯỚC MINH NGUYỆT</label>
+                <div className="space-y-1.5">
+                  {Object.entries(MINH_NGUYET_STEP_LABELS).map(([stepId, meta]) => {
+                    const step = stepId as MinhNguyetStep;
+                    const isSelected = store.config.selectedMnSteps.includes(step);
+                    const isOptional = ['three_faces', 'nsfw_palette', 'npc_creation'].includes(step);
+                    return (
+                      <div key={step} className={cn(
+                        'flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all text-xs',
+                        isSelected ? 'border-violet-500/30 bg-violet-500/5' : 'border-border bg-card opacity-60 hover:opacity-100'
+                      )} onClick={() => !store.isRunning && store.toggleMnStep(step)}>
+                        <span className="text-sm">{meta.icon}</span>
+                        <div className="flex-1">
+                          <span className="font-medium">{meta.label}</span>
+                          {isOptional && <span className="ml-1 text-[10px] text-muted-foreground">(tùy chọn)</span>}
+                          <div className="text-[10px] text-muted-foreground">{meta.desc}</div>
+                        </div>
+                        <div className={cn('w-4 h-4 rounded-sm border flex items-center justify-center', isSelected ? 'bg-violet-500 border-violet-500' : 'border-muted-foreground/30')}>
+                          {isSelected && <Check className="w-3 h-3 text-white" />}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">☑️ CÁC BƯỚC TẠO CARD</label>
+              <div className="space-y-1.5">{STEP_DEFS.map(s => renderStepConfig(s.id))}</div>
+            </div>
+          )}
         </div>
 
         <div className="p-4 border-t border-border bg-card/50 shrink-0">
@@ -286,10 +407,40 @@ export function AutoCreatorPage() {
         )}
 
         {/* Stepper */}
-        <div className="p-6 shrink-0 border-b border-border bg-card/50">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">📊 TIẾN TRÌNH</h3>
+        <div className="flex-1 overflow-y-auto scrollbar-thin p-6 border-b border-border bg-card/50 min-h-0">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">
+            {isMinhNguyet ? '🌙 TIẾN TRÌNH MINH NGUYỆT' : '📊 TIẾN TRÌNH'}
+          </h3>
           <div className="space-y-3">
-            {store.config.selectedSteps.map((step, idx) => {
+            {isMinhNguyet ? (
+              store.config.selectedMnSteps.map((step, idx) => {
+                const status = store.mnStepStatuses[step];
+                const meta = MINH_NGUYET_STEP_LABELS[step];
+                const isActive = store.currentStep === step;
+                const result = store.mnStepResults[step];
+                return (
+                  <div key={step} className={cn(
+                    'flex items-center gap-3 px-3 py-2 rounded-lg transition-all',
+                    isActive ? 'bg-violet-500/10 ring-1 ring-violet-500/30' : 'bg-card/50'
+                  )}>
+                    <div className="text-xs text-muted-foreground w-4">{idx + 1}</div>
+                    {renderStatusIcon(status)}
+                    <span className="text-sm">{meta?.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <span className={cn('text-xs font-medium', isActive && 'text-violet-400')}>{meta?.label}</span>
+                      {result && <span className="text-[10px] text-muted-foreground ml-2">{result}</span>}
+                    </div>
+                    {status === 'error' && (
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => handleMnRetry(step)} className="p-1 rounded hover:bg-amber-500/20 text-amber-500"><RotateCcw className="w-3 h-3" /></button>
+                        <button onClick={() => skipMnStep(step)} className="p-1 rounded hover:bg-muted text-muted-foreground"><SkipForward className="w-3 h-3" /></button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              store.config.selectedSteps.map((step, idx) => {
               const status = store.stepStatuses[step];
               const def = STEP_DEFS.find(s => s.id === step);
               const isActive = store.currentStep === step;
@@ -315,7 +466,8 @@ export function AutoCreatorPage() {
                   {renderPreviewCard(step)}
                 </div>
               );
-            })}
+            })
+            )}
           </div>
         </div>
 

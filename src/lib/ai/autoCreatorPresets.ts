@@ -96,4 +96,79 @@ export const AUTO_CREATOR_PRESETS: AutoCreatorPreset[] = [
       },
     },
   },
+  // ═══ MINH NGUYỆT PRESETS ═══
+  {
+    id: 'mn_romance',
+    label: '🌙 MN: Romance',
+    icon: '🌙',
+    description: 'Minh Nguyệt — Romance: Bảng điều sắc + Tái diễn giải + Khai bạch',
+    config: {
+      pipelineMethod: 'minh_nguyet' as const,
+      selectedMnSteps: [
+        'worldview', 'character_basic', 'color_palette', 'secondary_explanation',
+        'wardrobe', 'character_overview', 'opening'
+      ] as const,
+      mnConfig: {
+        worldviewPath: 'small_world' as const,
+        cardType: 'single' as const,
+        includeThreeFaces: false,
+        includeNsfw: false,
+        includeNpc: false,
+        npcCount: 0,
+        alternateGreetings: 2,
+        autoTag: true,
+        promptMode: 'default' as const,
+      },
+    },
+  },
+  {
+    id: 'mn_deep_character',
+    label: '🌙 MN: Nhân vật sâu',
+    icon: '🎭',
+    description: 'Minh Nguyệt — Full: Điều sắc bảng + Ba diện tính + NSFW + NPC',
+    config: {
+      pipelineMethod: 'minh_nguyet' as const,
+      selectedMnSteps: [
+        'worldview', 'character_basic', 'color_palette', 'three_faces',
+        'secondary_explanation', 'wardrobe', 'nsfw_palette', 'npc_creation',
+        'character_overview', 'opening'
+      ] as const,
+      mnConfig: {
+        worldviewPath: 'small_world' as const,
+        cardType: 'single' as const,
+        includeThreeFaces: true,
+        includeNsfw: true,
+        includeNpc: true,
+        npcCount: 3,
+        alternateGreetings: 3,
+        autoTag: true,
+        promptMode: 'default' as const,
+      },
+    },
+  },
+  {
+    id: 'mn_large_world',
+    label: '🌙 MN: Thế giới lớn',
+    icon: '🌍',
+    description: 'Minh Nguyệt — Đường C: Thế giới nguyên tạo phức tạp + nhiều NPC',
+    config: {
+      pipelineMethod: 'minh_nguyet' as const,
+      selectedMnSteps: [
+        'worldview', 'character_basic', 'color_palette', 'three_faces',
+        'secondary_explanation', 'wardrobe', 'npc_creation',
+        'character_overview', 'opening'
+      ] as const,
+      mnConfig: {
+        worldviewPath: 'large_world' as const,
+        cardType: 'single' as const,
+        includeThreeFaces: true,
+        includeNsfw: false,
+        includeNpc: true,
+        npcCount: 5,
+        alternateGreetings: 2,
+        autoTag: true,
+        promptMode: 'default' as const,
+      },
+    },
+  },
 ];

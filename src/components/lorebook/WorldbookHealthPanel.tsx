@@ -3,7 +3,7 @@
  * Hiển thị kết quả health check + nút auto-fix
  */
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { ShieldCheck, ShieldAlert, ChevronDown, ChevronRight, Wrench, AlertTriangle, Info } from 'lucide-react';
 import { useCardStore } from '../../store/cardStore';
 import { checkWorldbookHealth, type HealthReport, type HealthWarning } from '../../lib/worldbook/worldbookHealthCheck';
@@ -17,10 +17,11 @@ export function WorldbookHealthPanel() {
   const [expanded, setExpanded] = useState(false);
   const [cardType, setCardType] = useState<CardType>('single');
 
-  const report = useMemo<HealthReport>(
-    () => checkWorldbookHealth(entries, cardType),
-    [entries, cardType],
-  );
+  const [report, setReport] = useState<HealthReport>({ errors: 0, warnings: 0, infos: 0, items: [] });
+
+  useEffect(() => {
+    checkWorldbookHealth(entries, cardType).then(setReport);
+  }, [entries, cardType]);
 
   const hasIssues = report.errors > 0 || report.warnings > 0;
   const fixableItems = useMemo(() => report.items.filter(i => i.autoFixable), [report.items]);

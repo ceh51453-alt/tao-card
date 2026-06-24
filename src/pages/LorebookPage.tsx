@@ -20,6 +20,7 @@ import { WikiScraperPanel } from '../components/lorebook/WikiScraperPanel';
 import { RAGDebugPanel } from '../components/lorebook/RAGDebugPanel';
 import { WorldbookHealthPanel } from '../components/lorebook/WorldbookHealthPanel';
 import { LorebookCategorizationPanel } from '../components/lorebook/LorebookCategorizationPanel';
+import { QualityCheckPanel } from '../components/lorebook/QualityCheckPanel';
 import {
   ENTRY_CATEGORY_LABELS, getPreset, getStrategyLabel,
   type EntryCategory, type CardType,
@@ -53,7 +54,7 @@ const estimateTokens = (text: string) => Math.ceil((text || '').length / 4);
 // ─── Main Page ──────────────────────────────────────────────────────────────
 
 export function LorebookPage() {
-  const [activeTab, setActiveTab] = useState<'entries' | 'batch' | 'doc' | 'wiki' | 'analysis'>('entries');
+  const [activeTab, setActiveTab] = useState<'entries' | 'batch' | 'doc' | 'wiki' | 'analysis' | 'quality'>('entries');
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
@@ -65,6 +66,7 @@ export function LorebookPage() {
           { id: 'doc' as const, label: 'Trích Xuất Tài Liệu', icon: FileText },
           { id: 'wiki' as const, label: 'Cào Wiki', icon: Globe },
           { id: 'analysis' as const, label: 'Phân tích', icon: Filter },
+          { id: 'quality' as const, label: 'Chất lượng MN', icon: Lock },
         ].map(tab => {
           const Icon = tab.icon;
           return (
@@ -84,6 +86,7 @@ export function LorebookPage() {
       {activeTab === 'doc' && <div className="flex-1 overflow-y-auto scrollbar-thin"><DocExtractPanel /></div>}
       {activeTab === 'wiki' && <div className="flex-1 overflow-y-auto scrollbar-thin"><WikiScraperPanel /></div>}
       {activeTab === 'analysis' && <div className="flex-1 overflow-y-auto scrollbar-thin"><LorebookCategorizationPanel /></div>}
+      {activeTab === 'quality' && <div className="flex-1 overflow-y-auto scrollbar-thin p-4"><QualityCheckPanel /></div>}
     </div>
   );
 }

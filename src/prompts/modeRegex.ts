@@ -228,6 +228,47 @@ Trigger: thay {{char}} / {{user}} trong pattern trước khi match
   markdownOnly : true
   promptOnly   : false
   substituteRegex: 1   ← Raw: thay macro trong findRegex trước
+
+──────────────────────────────────────────────────────────────────
+PATTERN H — MINH NGUYỆT: TAG <tên_idN> BEAUTIFIER
+Trigger: <tên_idN>...</tên_idN> → render tag label + nội dung
+──────────────────────────────────────────────────────────────────
+  scriptName   : "[MN] Render Tag ID"
+  findRegex    : "/<([^>]+_id(\\\\d+))>([\\\\s\\\\S]*?)<\\\\/\\\\1>/gsi"
+  replaceString: "<div style=\\"border-left:3px solid rgba(139,92,246,0.5);padding:4px 8px;margin:4px 0\\"><span style=\\"font-size:10px;color:#8b5cf6;opacity:0.7\\">🏷 $1</span><div>$3</div></div>"
+  placement    : [2]
+  markdownOnly : true    ← chỉ render đẹp, AI vẫn thấy tag gốc
+  promptOnly   : false
+  substituteRegex: 0
+
+  → $1 = full tag (e.g. "秋明月_id5")
+  → $2 = số ID (e.g. "5")
+  → $3 = nội dung bên trong tag
+
+──────────────────────────────────────────────────────────────────
+PATTERN I — MINH NGUYỆT: ĐIỀU SẮC PALETTE WIDGET
+Trigger: [Bảng điều sắc] / [Color Palette] → render đẹp
+──────────────────────────────────────────────────────────────────
+  scriptName   : "[MN] Render Bảng Điều Sắc"
+  findRegex    : "/\\\\[(?:Bảng điều sắc|Color Palette|调色盘)\\\\]([\\\\s\\\\S]*?)(?=\\\\[|$)/gsi"
+  replaceString: "<div style=\\"background:linear-gradient(135deg,#1a1025,#2d1b4e);border:1px solid rgba(139,92,246,0.3);border-radius:12px;padding:12px;margin:8px 0\\"><div style=\\"color:#c4b5fd;font-size:0.85em;font-weight:600;margin-bottom:8px\\">🎨 Bảng Điều Sắc Tính Cách</div><div style=\\"color:#e2e8f0;font-size:0.85em;white-space:pre-wrap\\">$1</div></div>"
+  placement    : [2]
+  markdownOnly : true
+  promptOnly   : false
+
+──────────────────────────────────────────────────────────────────
+PATTERN J — MINH NGUYỆT: ẨN INTERNAL TAGS KHỎI USER
+Trigger: <thế_giới_quan_idN>...</> → ẩn tag nhưng giữ nội dung
+──────────────────────────────────────────────────────────────────
+  scriptName   : "[MN] Ẩn Tag ID khỏi UI"
+  findRegex    : "/<[^>]+_id\\\\d+>|<\\\\/[^>]+_id\\\\d+>/g"
+  replaceString: ""       ← xóa tag, chỉ giữ nội dung bên trong
+  placement    : [2]
+  markdownOnly : true     ← AI vẫn thấy tag gốc để context đúng
+  promptOnly   : false
+
+  → Dùng khi KHÔNG muốn render tag (thay thế cho Pattern H)
+  → Chọn 1 trong 2: Pattern H (render tag đẹp) HOẶC Pattern J (ẩn tag)
 `;
 
 // ─── 3. BEST PRACTICES ──────────────────────────────────────────────────────────
@@ -422,6 +463,9 @@ BƯỚC 2 — CHỌN PATTERN TYPE:
   • Text styling     → Pattern E (markdownOnly=true, replaceString=HTML span)
   • Depth filter     → Pattern F (thêm minDepth/maxDepth)
   • Macro substitution → Pattern G (substituteRegex=1)
+  • MN Tag beautify  → Pattern H (render <tên_idN> đẹp, markdownOnly)
+  • MN Palette widget → Pattern I (render bảng điều sắc)
+  • MN Tag ẩn        → Pattern J (ẩn tag khỏi UI, giữ nội dung)
 
 BƯỚC 3 — VIẾT REGEX:
   • Test logic regex bằng cách giải thích từng phần trong "thought"

@@ -16,7 +16,16 @@ export type EntryCategory =
   | 'npc'                    // NPC
   | 'scene'                  // Cảnh vật / Sự kiện
   | 'secondary_explanation'  // Giải thích lần hai (D0)
+  // ═══ Minh Nguyệt categories ═══
+  | 'color_palette'          // Bảng điều sắc tính cách
+  | 'three_faces'            // Ba diện tính
+  | 'wardrobe'               // Tủ quần áo
+  | 'nsfw_palette'           // Bảng NSFW
+  | 'opening'                // Khai bạch
   | 'custom';                // Tuỳ chỉnh tự do
+
+/** Đường thế giới quan Minh Nguyệt */
+export type WorldviewPath = 'real_background' | 'small_world' | 'large_world';
 
 /** Loại thẻ: đơn nhân vật vs nhiều nhân vật */
 export type CardType = 'single' | 'multi';
@@ -53,7 +62,19 @@ export const ENTRY_CATEGORY_LABELS: Record<EntryCategory, { label: string; icon:
   npc:                    { label: 'NPC',                          icon: '🤝' },
   scene:                  { label: 'Cảnh vật / Sự kiện',           icon: '🏞' },
   secondary_explanation:  { label: 'Giải thích lần hai (D0)',      icon: '🎯' },
+  // Minh Nguyệt
+  color_palette:          { label: 'Bảng điều sắc tính cách',      icon: '🎨' },
+  three_faces:            { label: 'Ba diện tính',                 icon: '🎭' },
+  wardrobe:               { label: 'Tủ quần áo',                   icon: '👗' },
+  nsfw_palette:           { label: 'Bảng NSFW',                    icon: '🔞' },
+  opening:                { label: 'Khai bạch',                    icon: '📜' },
   custom:                 { label: 'Tuỳ chỉnh tự do',             icon: '⚙️' },
+};
+
+export const WORLDVIEW_PATH_LABELS: Record<WorldviewPath, { label: string; desc: string }> = {
+  real_background: { label: 'Đường A: Bối cảnh thực', desc: 'AI đã biết — chỉ cần ghi chú khác biệt' },
+  small_world:    { label: 'Đường B: Thế giới nhỏ',  desc: 'AI biết cơ bản, cần tùy chỉnh chi tiết' },
+  large_world:    { label: 'Đường C: Thế giới lớn',  desc: 'Nguyên tạo/phức tạp — cần worldbook đầy đủ' },
 };
 
 export const CARD_TYPE_LABELS: Record<CardType, string> = {
@@ -200,6 +221,102 @@ export const SINGLE_CARD_PRESETS: Record<Exclude<EntryCategory, 'custom'>, Categ
     },
     keywordHint: 'Tên nhân vật cần điều chỉnh. VD: "Lâm Tiểu Vũ,Tiểu Vũ"',
   },
+
+  // ═══ Minh Nguyệt categories ═══
+  color_palette: {
+    label: 'Color Palette',
+    labelVi: 'Bảng điều sắc tính cách',
+    icon: '🎨',
+    description: 'Màu nền + Chủ sắc + Phái sinh + Điểm xuyết. Thường trú (thẻ đơn).',
+    defaults: {
+      constant: true,
+      selective: false,
+      position: 1,
+      depth: 4,
+      role: null,
+      insertion_order: 30,
+      scan_depth: null,
+      exclude_recursion: true,
+      prevent_recursion: true,
+    },
+    keywordHint: 'Entry thường trú (thẻ đơn) → không cần từ khóa.',
+  },
+
+  three_faces: {
+    label: 'Three Faces',
+    labelVi: 'Ba diện tính',
+    icon: '🎭',
+    description: 'Diện công khai + Riêng tư + Mặt nạ. Tùy chọn.',
+    defaults: {
+      constant: true,
+      selective: false,
+      position: 1,
+      depth: 4,
+      role: null,
+      insertion_order: 35,
+      scan_depth: null,
+      exclude_recursion: true,
+      prevent_recursion: true,
+    },
+    keywordHint: 'Entry thường trú (thẻ đơn) → không cần từ khóa.',
+  },
+
+  wardrobe: {
+    label: 'Wardrobe',
+    labelVi: 'Tủ quần áo',
+    icon: '👗',
+    description: 'Bộ trang phục theo ngữ cảnh (thường ngày, formal, chiến đấu...). Thường trú.',
+    defaults: {
+      constant: true,
+      selective: false,
+      position: 1,
+      depth: 4,
+      role: null,
+      insertion_order: 40,
+      scan_depth: null,
+      exclude_recursion: true,
+      prevent_recursion: true,
+    },
+    keywordHint: 'Entry thường trú (thẻ đơn) → không cần từ khóa.',
+  },
+
+  nsfw_palette: {
+    label: 'NSFW Palette',
+    labelVi: 'Bảng NSFW',
+    icon: '🔞',
+    description: 'Bảng điều sắc NSFW. Xanh lá, kích hoạt bằng từ khóa.',
+    defaults: {
+      constant: false,
+      selective: true,
+      position: 1,
+      depth: 4,
+      role: null,
+      insertion_order: 50,
+      scan_depth: 2,
+      exclude_recursion: true,
+      prevent_recursion: true,
+    },
+    keywordHint: 'Tên nhân vật + từ khóa NSFW.',
+  },
+
+  opening: {
+    label: 'Opening',
+    labelVi: 'Khai bạch',
+    icon: '📜',
+    description: 'Lời mở đầu — first_mes + alternate greetings.',
+    defaults: {
+      constant: false,
+      selective: false,
+      position: 0,
+      depth: 4,
+      role: null,
+      insertion_order: 999,
+      scan_depth: null,
+      exclude_recursion: true,
+      prevent_recursion: true,
+    },
+    keywordHint: 'Khai bạch không dùng keyword — chỉ là first message.',
+  },
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -240,10 +357,26 @@ export const MULTI_CARD_PRESETS: Record<Exclude<EntryCategory, 'custom'>, Catego
     description: 'Chỉ đạo AI — D0, role=system. Dùng xanh lá, kích hoạt bằng tên nhân vật.',
     defaults: {
       ...SINGLE_CARD_PRESETS.secondary_explanation.defaults,
-      // Thẻ nhiều: thứ tự có thể khác (NV A=1, NV B=2)
       insertion_order: 1,
     },
   },
+
+  // MN categories — multi card: chuyển sang selective
+  color_palette: {
+    ...SINGLE_CARD_PRESETS.color_palette,
+    description: 'Thẻ nhiều NV: bảng điều sắc theo từ khóa.',
+    defaults: { ...SINGLE_CARD_PRESETS.color_palette.defaults, constant: false, selective: true, scan_depth: 2 },
+  },
+  three_faces: {
+    ...SINGLE_CARD_PRESETS.three_faces,
+    defaults: { ...SINGLE_CARD_PRESETS.three_faces.defaults, constant: false, selective: true, scan_depth: 2 },
+  },
+  wardrobe: {
+    ...SINGLE_CARD_PRESETS.wardrobe,
+    defaults: { ...SINGLE_CARD_PRESETS.wardrobe.defaults, constant: false, selective: true, scan_depth: 2 },
+  },
+  nsfw_palette: { ...SINGLE_CARD_PRESETS.nsfw_palette },
+  opening: { ...SINGLE_CARD_PRESETS.opening },
 };
 
 // ═══════════════════════════════════════════════════════════════════════════

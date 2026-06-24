@@ -192,6 +192,7 @@ export function applyStepPreview(step: AutoCreatorStep) {
 
   applyParsedDataToCard(step, data, config, cardStore);
   store.setStepStatus(step, 'done');
+  store.setStepPreview(step, null);
   store.addLog({ step, level: 'success', message: `✅ Preview applied: ${step}` });
 }
 

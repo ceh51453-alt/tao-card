@@ -1,6 +1,9 @@
 import type { EntryCategory, CardType } from '../lib/worldbook/worldbookConfig';
 
-// ═══ Các bước pipeline ═══
+// ═══ Phương pháp Pipeline ═══
+export type PipelineMethod = 'standard' | 'minh_nguyet';
+
+// ═══ Các bước pipeline — Standard ═══
 export type AutoCreatorStep =
   | 'basic_info'        // Name, Description, Personality, Scenario
   | 'lorebook'          // Lorebook entries
@@ -10,6 +13,22 @@ export type AutoCreatorStep =
   | 'first_message'     // First message + alternate greetings
   | 'mes_example';      // Message examples
 
+// ═══ Các bước pipeline — Minh Nguyệt ═══
+export type MinhNguyetStep =
+  | 'worldview'              // Thế giới quan (Đường A/B/C)
+  | 'character_basic'        // Nhân vật cơ sở
+  | 'color_palette'          // Bảng điều sắc tính cách
+  | 'three_faces'            // Ba diện tính (tùy chọn)
+  | 'secondary_explanation'  // Tái diễn giải
+  | 'wardrobe'               // Tủ quần áo
+  | 'nsfw_palette'           // Bảng NSFW (tùy chọn)
+  | 'npc_creation'           // Tạo NPC (tùy chọn)
+  | 'character_overview'     // Xem lướt nhân vật
+  | 'opening';               // Khai bạch
+
+/** Union step type cho cả 2 phương pháp */
+export type AnyPipelineStep = AutoCreatorStep | MinhNguyetStep;
+
 export type StepStatus = 'pending' | 'running' | 'done' | 'error' | 'skipped';
 
 /** v3: Mỗi bước có 3 phase: generate → preview → apply */
@@ -17,6 +36,9 @@ export type StepPhase = 'idle' | 'generating' | 'previewing' | 'applied' | 'erro
 
 // ═══ Prompt override ═══
 export type PromptMode = 'default' | 'append' | 'replace';
+
+// ═══ Đường thế giới quan (Minh Nguyệt) ═══
+export type WorldviewPath = 'real_background' | 'small_world' | 'large_world';
 
 // ═══ Config từng bước (user tùy chỉnh) ═══
 export interface LorebookStepConfig {
@@ -73,10 +95,26 @@ export interface MesExampleStepConfig {
   promptMode: PromptMode;
 }
 
+// ═══ Config Minh Nguyệt cho từng bước ═══
+export interface MinhNguyetStepConfig {
+  worldviewPath: WorldviewPath;    // Đường A/B/C
+  cardType: CardType;              // Thẻ đơn/nhiều NV
+  includeThreeFaces: boolean;      // Có ba diện tính không
+  includeNsfw: boolean;            // Có bảng NSFW không
+  includeNpc: boolean;             // Có NPC không
+  npcCount: number;                // Số NPC (1-10)
+  alternateGreetings: number;      // Số khai bạch thay thế (0-5)
+  autoTag: boolean;                // Tự động gán tag <tên_idN>
+  promptOverride?: string;
+  promptMode: PromptMode;
+}
+
 // ═══ Config tổng thể ═══
 export interface AutoCreatorConfig {
   idea: string;                          // Ý tưởng chính
-  selectedSteps: AutoCreatorStep[];      // Các bước đã bật (có thứ tự)
+  pipelineMethod: PipelineMethod;        // 'standard' | 'minh_nguyet'
+  selectedSteps: AutoCreatorStep[];      // Các bước đã bật — Standard
+  selectedMnSteps: MinhNguyetStep[];     // Các bước đã bật — Minh Nguyệt
   autoApplyAll: boolean;                 // true = apply ngay, false = dừng ở preview
   presetId?: string;                     // Preset đang dùng
   stepConfigs: {
@@ -88,6 +126,7 @@ export interface AutoCreatorConfig {
     first_message: FirstMessageStepConfig;
     mes_example: MesExampleStepConfig;
   };
+  mnConfig: MinhNguyetStepConfig;        // Config chung cho Minh Nguyệt
 }
 
 // ═══ Step Preview (v3) ═══
@@ -154,7 +193,7 @@ export interface AutoCreatorPreset {
 export interface PipelineLog {
   id: string;
   timestamp: number;
-  step: AutoCreatorStep | 'system' | 'blueprint';
+  step: AnyPipelineStep | 'system' | 'blueprint';
   level: 'info' | 'success' | 'warning' | 'error';
   message: string;
 }

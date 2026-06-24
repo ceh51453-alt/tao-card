@@ -55,10 +55,10 @@ function hasSpaceAfterComma(keys: string[]): boolean {
 // MAIN HEALTH CHECK
 // ═══════════════════════════════════════════════════════════════════════════
 
-export function checkWorldbookHealth(
+export async function checkWorldbookHealth(
   entries: LorebookEntry[],
   cardType: CardType,
-): HealthReport {
+): Promise<HealthReport> {
   const items: HealthWarning[] = [];
 
   for (const entry of entries) {
@@ -203,6 +203,29 @@ export function checkWorldbookHealth(
         autoFixable: false,
       });
     }
+  }
+
+  // ─── 11. Minh Nguyệt: Bát cổ + Tag (nếu có qualityChecker) ────
+  try {
+    const { runQualityCheck } = await import('../validation/qualityChecker');
+    const qReport = runQualityCheck(entries);
+
+    // Chuyển quality issues thành health warnings
+    for (const issue of qReport.issues) {
+      // Chỉ lấy error/warning, skip info để tránh quá nhiều noise
+      if (issue.level === 'info') continue;
+
+      items.push({
+        entryId: issue.entryId ?? -1,
+        comment: issue.entryComment ?? '',
+        level: issue.level,
+        code: `MN_${issue.category.toUpperCase()}_${issue.id.split('_')[0]}`,
+        message: `[Minh Nguyệt] ${issue.message}`,
+        autoFixable: false,
+      });
+    }
+  } catch {
+    // qualityChecker import failed — skip silently
   }
 
   return {
