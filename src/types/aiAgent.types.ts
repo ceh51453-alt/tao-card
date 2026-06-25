@@ -101,6 +101,12 @@ export interface AIGeneratedEntry {
   constant?: boolean;      // default false
   selective?: boolean;     // default true
   insertion_order?: number;
+  // ── AI Auto-Config per entry ──
+  position?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;  // vị trí inject trong prompt
+  depth?: number;                                // depth cho position=4 (@depth)
+  role?: 0 | 1 | 2 | null;                      // 0=system, 1=user, 2=assistant
+  scan_depth?: number | null;                    // quét bao nhiêu tin nhắn
+  category_hint?: string;                        // gợi ý loại entry (worldview, npc, scene...)
 }
 
 // ========== WORLDBUILDING MODES ==========

@@ -36,6 +36,7 @@ export interface BatchGenConfig {
   category?: EntryCategory;    // loại entry theo guide worldbook
   cardType?: CardType;         // thẻ đơn vs nhiều nhân vật
   useWebSearch?: boolean;      // Kích hoạt SOTA Web Search
+  autoConfig?: boolean;        // true = AI tự quyết order/position/depth per entry
 }
 
 export interface BatchProgress {
@@ -88,9 +89,116 @@ KHÔNG TRÙNG LẶP với danh sách "Entries đã có".
 • selective: true cho entry tải theo nhu cầu (NPC, cảnh vật, sự kiện)
 • insertion_order: worldview=1-3, overview=4, character=10-50, scene=50-98, NPC=100
 
-CHỈ trả về MỘT MẢNG JSON hợp lệ:
-[{"comment":"...","keys":["..."],"content":"..."},...  ]
-KHÔNG thêm giải thích, KHÔNG markdown, KHÔNG code block.`;
+CHỈ trả về MỘT MẢNG JSON hợp lệ. KHÔNG thêm giải thích, KHÔNG markdown, KHÔNG code block.`;
+
+// ─── AUTO-CONFIG ADDON (chỉ inject khi autoConfig=true) ──────────────────
+
+const AUTO_CONFIG_ADDON = `
+
+--- AUTO-CONFIG PER ENTRY (QUAN TRỌNG — ĐỌC KỸ) ---
+
+Ngoài comment/keys/content, bạn PHẢI trả thêm config cho MỖI entry. Dưới đây là BẢNG PHÂN LOẠI CHUẨN:
+
+═══ 7 LOẠI ENTRY & CẤU HÌNH TƯƠNG ỨNG ═══
+
+1. THẾ GIỚI QUAN / BỐI CẢNH (Tổng cương thế giới)
+   → constant=true, selective=false
+   → position=0 (before_char), depth=4
+   → insertion_order=1-3
+   → scan_depth=null (constant không cần scan)
+   Nội dung: Tên thế giới, quy tắc cốt lõi, khu vực lớn. Viết dạng YAML/database.
+   Luôn thường trú (đèn xanh dương). Dùng ít chữ nhất nói rõ mọi thiết lập.
+
+2. TỔNG QUAN KHU VỰC (Xem lướt)
+   → constant=true, selective=false
+   → position=0 (before_char), depth=4
+   → insertion_order=4-10
+   → scan_depth=null
+   Nội dung: Liệt kê khu vực + 1 câu định vị. KHÔNG triển khai chi tiết.
+
+3. XEM LƯỚT NHÂN VẬT (Character Overview)
+   → constant=true, selective=false
+   → position=0 (before_char), depth=4
+   → insertion_order=4
+   → scan_depth=null
+   Nội dung: Giới thiệu vắn tắt tất cả nhân vật. Luôn thường trú.
+
+4. CHI TIẾT NHÂN VẬT CỐT LÕI
+   Thẻ đơn (1 nhân vật):
+     → constant=true, selective=false ← QUY LUẬT THÉP: thẻ đơn = toàn bộ đèn xanh dương
+     → position=1 (after_char), depth=4
+     → insertion_order=10-50 (cơ bản=10, ngoại hình=20, tính cách=30, bối cảnh=40, NSFW=50)
+     → scan_depth=null
+   Thẻ nhiều nhân vật (2+ nhân vật):
+     → constant=false, selective=true ← đèn xanh lá, chỉ tải khi nhắc đến
+     → position=1 (after_char), depth=4
+     → insertion_order=99
+     → scan_depth=2
+
+5. NPC (Vai phụ)
+   → constant=false, selective=true
+   → position=1 (after_char), depth=4
+   → insertion_order=100
+   → scan_depth=2
+   Từ khóa: Tên đầy đủ, biệt danh, ngoại hiệu, chức vụ, tất cả cách gọi có thể.
+   Ví dụ: "Vương Tĩnh,Cô giáo Vương,Giáo viên chủ nhiệm"
+
+6. CẢNH VẬT / SỰ KIỆN / ĐỊA DANH
+   → constant=false, selective=true
+   → position=1 (after_char), depth=4
+   → insertion_order=50-98
+   → scan_depth=2
+   Từ khóa: Tên cảnh vật, tên khu vực, tên gọi khác, hành động liên quan.
+   Ví dụ: "Thư viện,Thư viện trường,Mượn sách"
+
+7. GIẢI THÍCH LẦN HAI / CHỈ ĐẠO AI (D0)
+   → constant=false, selective=true
+   → position=4 (@depth), depth=0, role=0 (system)
+   → insertion_order=1
+   → scan_depth=2
+   Nội dung: Điều chỉnh hành vi AI cho nhân vật cụ thể. D0 = vị trí AI đọc cuối cùng = sức ảnh hưởng mạnh nhất.
+   Từ khóa: Tên nhân vật cần điều chỉnh.
+
+═══ QUY TẮC THIẾT KẾ TỪ KHÓA ═══
+• Ngăn cách bằng dấu phẩy tiếng Anh (,), KHÔNG có khoảng trắng sau phẩy
+• Bao phủ TẤT CẢ cách xưng hô: tên đầy đủ, biệt danh, ngoại hiệu, chức vụ, tên gọi khác
+• Thế lực: tên đầy đủ, viết tắt, địa danh trụ sở
+• NPC: tên đầy đủ, biệt danh, ngoại hiệu, chức vụ
+• Cảnh vật: tên địa danh, tên gọi khác, hành động liên quan
+• Entry thường trú (constant=true) → KHÔNG cần từ khóa
+
+═══ QUY TẮC VIẾT CONTENT ═══
+• Dùng định dạng database (YAML/danh sách), KHÔNG viết như tiểu thuyết
+• NÉN KHÔNG PHẢI XÓA: dùng ít chữ nhất nói rõ mọi thiết lập
+• Thay "là một", "tồn tại", "được cấu thành từ" bằng dấu hai chấm và liệt kê
+• Tiêu chuẩn: xóa câu này đi AI có diễn sai không? Không thì xóa
+• KHÔNG viết đánh giá chủ quan ("hùng mạnh", "bí ẩn"), KHÔNG viết hình ảnh tu từ
+
+═══ BẢNG TÓM TẮT NHANH ═══
+Loại             | const | selec | pos | depth | order  | scan
+Thế giới quan    | true  | false | 0   | 4     | 1-3    | null
+Tổng quan KV     | true  | false | 0   | 4     | 4-10   | null
+Xem lướt NV      | true  | false | 0   | 4     | 4      | null
+Chi tiết NV(đơn) | true  | false | 1   | 4     | 10-50  | null
+Chi tiết NV(đa)  | false | true  | 1   | 4     | 99     | 2
+NPC              | false | true  | 1   | 4     | 100    | 2
+Cảnh vật/SK      | false | true  | 1   | 4     | 50-98  | 2
+Chỉ đạo AI(D0)  | false | true  | 4   | 0     | 1      | 2
+
+JSON FORMAT BẮT BUỘC:
+[{
+  "comment": "Tên entry",
+  "keys": ["từ khóa 1","từ khóa 2"],
+  "content": "Nội dung dạng database...",
+  "constant": true/false,
+  "selective": true/false,
+  "insertion_order": number,
+  "position": 0|1|4,
+  "depth": 4,
+  "role": null,
+  "scan_depth": 2|null
+}, ...]
+`;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // USER MESSAGE BUILDER
@@ -183,6 +291,14 @@ function validateEntries(arr: unknown[]): AIGeneratedEntry[] | null {
       constant: typeof e.constant === 'boolean' ? e.constant : undefined,
       selective: typeof e.selective === 'boolean' ? e.selective : undefined,
       insertion_order: typeof e.insertion_order === 'number' ? e.insertion_order : undefined,
+      // AI Auto-Config per entry
+      position: typeof e.position === 'number' && [0,1,2,3,4,5,6,7].includes(e.position)
+        ? e.position as AIGeneratedEntry['position'] : undefined,
+      depth: typeof e.depth === 'number' ? e.depth : undefined,
+      role: typeof e.role === 'number' && [0,1,2].includes(e.role)
+        ? e.role as AIGeneratedEntry['role'] : (e.role === null ? null : undefined),
+      scan_depth: typeof e.scan_depth === 'number' ? e.scan_depth : undefined,
+      category_hint: typeof e.category_hint === 'string' ? e.category_hint : undefined,
     });
   }
   return valid.length > 0 ? valid : null;
@@ -254,7 +370,7 @@ export async function runBatchGeneration(config: BatchGenConfig, ctx: BatchRunCo
 
       const userMessage = buildBatchUserMessage(config, ctx.card, seen, ragCtx.injectionText, coherenceCtx, webInjection, countThisBatch, i, totalBatches);
       const messages: ChatMessage[] = [
-        { role: 'system', content: BATCH_SYSTEM_PROMPT + getProfileExtractionContext(profile) },
+        { role: 'system', content: BATCH_SYSTEM_PROMPT + (config.autoConfig ? AUTO_CONFIG_ADDON : '\n\nCHỈ trả về MỘT MẢNG JSON hợp lệ:\n[{"comment":"...","keys":["..."],"content":"..."},...  ]') + getProfileExtractionContext(profile) },
         { role: 'user', content: userMessage },
       ];
 

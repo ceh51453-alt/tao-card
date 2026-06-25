@@ -58,6 +58,7 @@ export function BatchGeneratorPanel() {
 
   const [useCardContext, setUseCardContext] = useState(true);
   const [useWebSearch, setUseWebSearch] = useState(false);
+  const [autoConfig, setAutoConfig] = useState(true);
   const [totalEntries, setTotalEntries] = useState(10);
   const [entriesPerBatch, setEntriesPerBatch] = useState(5);
   const [concurrentBatches, setConcurrentBatches] = useState(1);
@@ -141,6 +142,7 @@ export function BatchGeneratorPanel() {
           concurrentBatches,
           category: tab.category !== 'custom' ? tab.category : undefined,
           cardType: tab.cardType,
+          autoConfig,
         };
 
         await runBatchGeneration(config, {
@@ -179,7 +181,7 @@ export function BatchGeneratorPanel() {
     setIsVerifying(false);
   }, [activeProfile, prompts, activeTab, TABS, useCardContext, useWebSearch, totalEntries, entriesPerBatch, concurrentBatches,
       defaultPosition, insertionOrderMode, insertionOrderStart, maxRetries,
-      maxConsecErrors, modelOverride, settings.generationParams, addEntry, addLog, criteria]);
+      maxConsecErrors, modelOverride, autoConfig, settings.generationParams, addEntry, addLog, criteria]);
 
   const handlePause = useCallback(() => {
     const next = !ctxRef.current.paused;
@@ -299,39 +301,60 @@ export function BatchGeneratorPanel() {
           <> (<span className="text-foreground font-medium">{totalRounds}</span> vòng × {concurrentBatches} song song)</>)}
       </div>
 
-
-
-      {/* Position */}
-      <div>
-        <label className="settings-label">Vị trí mặc định</label>
-        <select value={defaultPosition} onChange={e => setDefaultPosition(Number(e.target.value) as 0|1|2|3|4|5|6|7)}
-          className="settings-input" disabled={isRunning}>
-          {Object.entries(POSITION_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
+      {/* AI Auto-Config Toggle */}
+      <div className="rounded-lg border border-violet-500/20 bg-violet-500/5 p-3 space-y-2">
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <input type="checkbox" checked={autoConfig} onChange={e => setAutoConfig(e.target.checked)}
+            className="settings-checkbox" disabled={isRunning} />
+          <span className="font-medium text-violet-400">🤖 AI tự sắp xếp order & config cho từng entry</span>
+        </label>
+        {autoConfig && (
+          <p className="text-[10px] text-muted-foreground ml-6">
+            AI sẽ tự quyết định <code className="px-1 py-0.5 rounded bg-muted">insertion_order</code>,{' '}
+            <code className="px-1 py-0.5 rounded bg-muted">position</code>,{' '}
+            <code className="px-1 py-0.5 rounded bg-muted">depth</code>,{' '}
+            <code className="px-1 py-0.5 rounded bg-muted">constant/selective</code>{' '}
+            cho từng entry dựa trên nội dung. Worldview sẽ được gán order=1-3, NPC=100+, etc.
+          </p>
+        )}
       </div>
 
-      {/* Insertion order */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="settings-label">Insertion Order</label>
-          <div className="flex gap-2">
-            <label className="flex items-center gap-1.5 text-xs cursor-pointer">
-              <input type="radio" name="ioMode" checked={insertionOrderMode === 'same'} disabled={isRunning}
-                onChange={() => setInsertionOrderMode('same')} className="settings-checkbox" /> Giữ nguyên
-            </label>
-            <label className="flex items-center gap-1.5 text-xs cursor-pointer">
-              <input type="radio" name="ioMode" checked={insertionOrderMode === 'increment'} disabled={isRunning}
-                onChange={() => setInsertionOrderMode('increment')} className="settings-checkbox" /> Tăng dần
-            </label>
+      {/* Position & Insertion Order — chỉ hiện khi tắt autoConfig */}
+      {!autoConfig && (
+        <>
+          {/* Position */}
+          <div>
+            <label className="settings-label">Vị trí mặc định</label>
+            <select value={defaultPosition} onChange={e => setDefaultPosition(Number(e.target.value) as 0|1|2|3|4|5|6|7)}
+              className="settings-input" disabled={isRunning}>
+              {Object.entries(POSITION_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
           </div>
-        </div>
-        <div>
-          <label className="settings-label">Bắt đầu từ</label>
-          <input type="number" value={insertionOrderStart}
-            onChange={e => setInsertionOrderStart(parseInt(e.target.value) || 100)}
-            className="settings-input" min={0} disabled={isRunning} />
-        </div>
-      </div>
+
+          {/* Insertion order */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="settings-label">Insertion Order</label>
+              <div className="flex gap-2">
+                <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                  <input type="radio" name="ioMode" checked={insertionOrderMode === 'same'} disabled={isRunning}
+                    onChange={() => setInsertionOrderMode('same')} className="settings-checkbox" /> Giữ nguyên
+                </label>
+                <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                  <input type="radio" name="ioMode" checked={insertionOrderMode === 'increment'} disabled={isRunning}
+                    onChange={() => setInsertionOrderMode('increment')} className="settings-checkbox" /> Tăng dần
+                </label>
+              </div>
+            </div>
+            <div>
+              <label className="settings-label">Bắt đầu từ</label>
+              <input type="number" value={insertionOrderStart}
+                onChange={e => setInsertionOrderStart(parseInt(e.target.value) || 100)}
+                className="settings-input" min={0} disabled={isRunning} />
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Advanced */}
       <div className="rounded-xl border border-border overflow-hidden">

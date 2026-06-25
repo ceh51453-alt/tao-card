@@ -1,0 +1,307 @@
+/**
+ * src/prompts/gameRegexPrompt.ts
+ * ──────────────────────────────────────────────────────────────────────────────
+ * Prompt chuyên dụng để AI sinh Regex Scripts cho Game UI trong SillyTavern.
+ * Dùng bởi GameFrontendPreview component khi user chọn "Tạo Regex Scripts".
+ *
+ * Reuses kiến thức từ:
+ * - modeRegex.ts: RegexScript interface, Pattern Library
+ * - modeGameDev.ts: Game component patterns
+ */
+
+import type { MVUZODSchema, MVUZODField } from '../types/mvuzod.types';
+import type { RegexScript } from '../types';
+
+// ─── SYSTEM PROMPT ──────────────────────────────────────────────────────────
+
+export const GAME_REGEX_SYSTEM_PROMPT = `
+Bạn là chuyên gia tạo Regex Scripts cho SillyTavern, chuyên về Game UI rendering.
+Nhiệm vụ: sinh ra một mảng RegexScript[] để render giao diện game đẹp trong chat.
+
+=== SCHEMA REGEX SCRIPT ===
+
+interface RegexScript {
+  scriptName: string;     // tên hiển thị — bắt đầu bằng prefix [Game] hoặc [Render] hoặc [AI]
+  findRegex: string;      // pattern dạng "/regex/flags" hoặc plain literal
+  replaceString: string;  // HTML thay thế; hỗ trợ $1-$9, {{char}}, {{user}}
+  trimStrings: string[];  // mảng chuỗi cần trim
+  placement: number[];    // [2] = AI Output (dùng hầu hết)
+  disabled: boolean;      // false
+  markdownOnly: boolean;  // true = chỉ renderer, AI vẫn thấy tag gốc
+  promptOnly: boolean;    // true = chỉ ảnh hưởng context gửi AI
+  runOnEdit: boolean;
+  substituteRegex: 0|1|2; // 0=None, 1=Raw (thay {{char}}), 2=Escaped
+  minDepth: number|null;
+  maxDepth: number|null;
+}
+
+KHÔNG cần field "id" — app sẽ tự sinh UUID.
+
+=== PLACEMENT ===
+1 = User Input, 2 = AI Output (dùng 99%), 3 = Slash, 4 = World Info, 5 = Reasoning
+
+=== MARKDOWNONLY vs PROMPTONLY ===
+- markdownOnly=true, promptOnly=false → chỉ render UI đẹp, AI vẫn thấy tag gốc
+- markdownOnly=false, promptOnly=true → xóa khỏi context AI, user vẫn thấy
+- CẢ HAI true → VÔ NGHĨA, KHÔNG dùng
+
+=== QUY TẮC THIẾT KẾ HTML ===
+
+1. **Inline styles only** — KHÔNG dùng external CSS, class riêng
+2. **Dark theme** — background tối (#0f172a, #1a202c, #1e293b), text sáng (#e2e8f0, #f1f5f9)
+3. **Border-radius** — Bo góc 8-16px
+4. **Font** — Dùng font-family: 'Noto Sans TC','Noto Serif SC', system-ui, sans-serif
+5. **Responsive** — max-width + margin auto, không hardcode width lớn
+6. **Gradient nhẹ** — background linear-gradient cho premium feel
+7. **Mobile-friendly** — padding đủ, touch target >= 40px
+8. **CSS Scoping** — prefix tất cả id với "stcs-" để tránh xung đột
+9. **Emoji** — Dùng emoji làm icon thay vì img/svg
+
+=== PATTERN QUAN TRỌNG ===
+
+**Pattern A — HTML Widget Renderer (phổ biến nhất):**
+findRegex: "<StatusPlaceHolderImpl/>"  ← literal tag
+markdownOnly: true, promptOnly: false
+substituteRegex: 1 (để thay {{char}}/{{user}} trong HTML)
+replaceString: HTML đẹp hiển thị game state
+
+**Pattern B — MVUZOD UpdateVariable (cần 3 scripts):**
+Script 1: [AI] Ẩn UpdateVariable khỏi context → promptOnly=true, replaceString=""
+Script 2: [Render] Cập nhật biến - Hoàn chỉnh → markdownOnly=true, render accordion
+Script 3: [Render] Cập nhật biến - Đang stream → markdownOnly=true, render spinner
+
+**Pattern C — Ẩn tags suy luận/thinking:**
+markdownOnly=true, replaceString="" → ẩn khỏi mắt user, AI vẫn thấy
+
+=== LƯU Ý ESCAPE ===
+- Trong findRegex dạng "/pattern/flags": mỗi \\ trong regex → \\\\ trong JSON string
+- Ví dụ: \\s trong regex → "\\\\s" trong JSON
+- Tag đóng: </tag> trong regex → "<\\\\/tag>" trong JSON string
+- Dùng flag s (dotAll) cho multi-line content: /pattern/gsi
+
+=== ĐỊNH DẠNG OUTPUT BẮT BUỘC ===
+
+Trả về JSON object:
+{
+  "explanation": "Giải thích ngắn gọn bộ scripts tạo ra",
+  "scripts": [
+    {
+      "scriptName": "...",
+      "findRegex": "...",
+      "replaceString": "...",
+      "trimStrings": [],
+      "placement": [2],
+      "disabled": false,
+      "markdownOnly": true/false,
+      "promptOnly": true/false,
+      "runOnEdit": false,
+      "substituteRegex": 0,
+      "minDepth": null,
+      "maxDepth": null
+    }
+  ]
+}
+
+CHỈ trả về JSON. KHÔNG markdown, KHÔNG giải thích bên ngoài JSON.
+`;
+
+// ─── USER PROMPT BUILDERS ───────────────────────────────────────────────────
+
+type GameComponent = 'status_bar' | 'opening_form' | 'game_screen' | 'full_set';
+
+/**
+ * Build user prompt cho AI, bao gồm schema + existing scripts + custom instructions.
+ */
+export function buildGameRegexUserPrompt(
+  component: GameComponent,
+  schema: MVUZODSchema,
+  existingRegexScripts: RegexScript[],
+  customInstructions?: string,
+): string {
+  const parts: string[] = [];
+
+  // 1. Schema context
+  parts.push(`=== MVUZOD SCHEMA CỦA CARD ===\n${formatSchemaForPrompt(schema)}`);
+
+  // 2. Existing scripts context
+  if (existingRegexScripts.length > 0) {
+    parts.push(`=== REGEX SCRIPTS ĐÃ CÓ (${existingRegexScripts.length} scripts) ===
+${existingRegexScripts.map((s, i) => {
+  const mode = s.markdownOnly ? 'Render' : s.promptOnly ? 'AI-only' : 'Both';
+  const status = s.disabled ? '🔴 TẮT' : '🟢 BẬT';
+  return `  [${i}] ${status} "${s.scriptName}" | find=${s.findRegex.slice(0, 60)}${s.findRegex.length > 60 ? '…' : ''} | ${mode} | placement=${s.placement.join(',')}`;
+}).join('\n')}
+
+QUAN TRỌNG: KHÔNG tạo lại scripts đã có. Chỉ tạo scripts MỚI bổ sung.
+Nếu đã có scripts render <StatusPlaceHolderImpl/>, KHÔNG tạo lại.`);
+  }
+
+  // 3. Component-specific instructions
+  parts.push(getComponentPrompt(component, schema));
+
+  // 4. Custom instructions from user
+  if (customInstructions?.trim()) {
+    parts.push(`=== YÊU CẦU BỔ SUNG TỪ NGƯỜI DÙNG ===\n${customInstructions.trim()}`);
+  }
+
+  return parts.join('\n\n');
+}
+
+// ─── COMPONENT-SPECIFIC PROMPTS ─────────────────────────────────────────────
+
+function getComponentPrompt(component: GameComponent, schema: MVUZODSchema): string {
+  switch (component) {
+    case 'status_bar':
+      return buildStatusBarPrompt(schema);
+    case 'opening_form':
+      return buildOpeningFormPrompt(schema);
+    case 'game_screen':
+      return buildGameScreenPrompt(schema);
+    case 'full_set':
+      return buildFullSetPrompt(schema);
+  }
+}
+
+function buildStatusBarPrompt(schema: MVUZODSchema): string {
+  const fields = schema.fields.filter(f => !f.constraints?.hidden);
+  const numericFields = collectLeafFields(fields).filter(f => f.type === 'number');
+  const enumFields = collectLeafFields(fields).filter(f => f.constraints?.enumValues?.length);
+
+  return `=== YÊU CẦU: TẠO REGEX RENDER STATUS BAR ===
+
+Tạo regex script để render tag <StatusPlaceHolderImpl/> thành bảng trạng thái đẹp.
+
+Thông tin schema:
+- Tổng ${fields.length} field gốc
+- ${numericFields.length} field số (hiển thị dạng progress bar hoặc counter)
+- ${enumFields.length} field enum (hiển thị dạng badge/tag)
+
+Các field chính cần hiển thị:
+${fields.map(f => `  - ${f.label} (${f.type}${f.children?.length ? `, ${f.children.length} children` : ''})`).join('\n')}
+
+YÊU CẦU:
+1. Tạo 1 script: findRegex = "<StatusPlaceHolderImpl/>"
+2. replaceString = HTML widget hiển thị các biến game dạng grid/pills
+3. markdownOnly=true, placement=[2], substituteRegex=1
+4. Dùng TavernHelper EJS để đọc biến: <% const data = Mvu.getMvuData({type:'message',message_id:'latest'})?.stat_data ?? {}; %>
+5. Hiển thị progress bar cho field số, badge cho enum, icon cho boolean
+6. Design premium, dark theme, responsive`;
+}
+
+function buildOpeningFormPrompt(schema: MVUZODSchema): string {
+  const editableFields = collectLeafFields(schema.fields)
+    .filter(f => !f.constraints?.readOnly && !f.constraints?.hidden)
+    .slice(0, 12);
+
+  return `=== YÊU CẦU: TẠO REGEX RENDER OPENING FORM ===
+
+Tạo regex script để render form mở đầu game (Opening Form / 开场表格).
+Form này hiển thị ở tin nhắn đầu tiên, cho phép người chơi thiết lập thông số ban đầu.
+
+Các field có thể chỉnh sửa (${editableFields.length} fields):
+${editableFields.map(f => {
+  const extras: string[] = [];
+  if (f.type === 'number' && f.constraints?.clamp) extras.push(`range: ${f.constraints.clamp[0]}~${f.constraints.clamp[1]}`);
+  if (f.constraints?.enumValues?.length) extras.push(`options: ${f.constraints.enumValues.join(', ')}`);
+  if (f.defaultValue !== undefined) extras.push(`default: ${f.defaultValue}`);
+  return `  - ${f.label} (${f.type}${extras.length ? ' | ' + extras.join(' | ') : ''})`;
+}).join('\n')}
+
+YÊU CẦU:
+1. Tạo 1 script: findRegex render form vào <StatusPlaceHolderImpl/> hoặc tag custom
+2. replaceString = HTML form đẹp với input fields tương ứng
+3. markdownOnly=true, placement=[2], substituteRegex=1
+4. Form có nút Submit → dùng JavaScript gọi setvar() để ghi biến
+5. Input type phù hợp: number cho số (có min/max), select cho enum, checkbox cho boolean
+6. minDepth=0, maxDepth=0 → chỉ hiển thị ở tin nhắn đầu tiên
+7. Design premium: gradient background, smooth inputs, hover effects`;
+}
+
+function buildGameScreenPrompt(schema: MVUZODSchema): string {
+  const statusFields = schema.fields.filter(f => !f.constraints?.hidden).slice(0, 8);
+
+  return `=== YÊU CẦU: TẠO REGEX RENDER GAME SCREEN ===
+
+Tạo bộ regex scripts để render màn hình game chính. Cần nhiều scripts:
+
+1. **Parse & render <maintext>**: Tách nội dung AI trả về → hiển thị đẹp
+2. **Parse & render <option>**: Các lựa chọn → render dạng button đẹp
+3. **Status bar compact**: Hiển thị compact ở đầu mỗi tin nhắn
+4. **Ẩn các tag khỏi UI**: <thinking>, <logic_check>, tags hệ thống
+
+Các field cần hiển thị trong status compact:
+${statusFields.map(f => `  - ${f.label} (${f.type})`).join('\n')}
+
+YÊU CẦU:
+1. Script ẩn <thinking> tags: markdownOnly=true, replaceString=""
+2. Script render <maintext>: markdownOnly=true, render text đẹp với typography tốt
+3. Script render <option>: markdownOnly=true, render buttons có onclick gửi lựa chọn
+4. Script status compact: hiển thị pills/badges ở đầu tin nhắn
+5. Các script render dùng substituteRegex=1
+6. Design cinematic: immersive feel, good typography, subtle animations`;
+}
+
+function buildFullSetPrompt(schema: MVUZODSchema): string {
+  return `=== YÊU CẦU: TẠO BỘ ĐẦY ĐỦ REGEX SCRIPTS CHO GAME ===
+
+Tạo bộ hoàn chỉnh regex scripts cho game UI, bao gồm TẤT CẢ các loại:
+
+1. **Status Bar Widget**: Render <StatusPlaceHolderImpl/> → bảng trạng thái
+2. **UpdateVariable Beautifier** (3 scripts):
+   - [AI] Ẩn khỏi context: promptOnly=true, replaceString=""
+   - [Render] Hoàn chỉnh: markdownOnly=true, render accordion đẹp
+   - [Render] Đang stream: markdownOnly=true, render spinner
+3. **Thinking/Logic Hider**: Ẩn <thinking>, <logic_check> khỏi UI
+4. **Text Styling** (tùy chọn):
+   - Tô màu lời thoại "..." 
+   - Tô màu hành động *...*
+
+Schema info:
+${formatSchemaForPrompt(schema)}
+
+Tổng cộng nên tạo 5-8 scripts. Thứ tự quan trọng:
+- Scripts promptOnly (ẩn khỏi AI) phải ĐẶT TRƯỚC scripts markdownOnly (render)
+- Scripts ẩn tag phải đặt trước scripts render cùng tag`;
+}
+
+// ─── HELPERS ────────────────────────────────────────────────────────────────
+
+function formatSchemaForPrompt(schema: MVUZODSchema): string {
+  const lines: string[] = [];
+
+  function walk(fields: MVUZODField[], indent: number) {
+    for (const f of fields) {
+      const pad = '  '.repeat(indent);
+      const name = f.path.split('/').filter(Boolean).pop() ?? f.path;
+      const extras: string[] = [];
+
+      if (f.constraints?.hidden) extras.push('hidden');
+      if (f.constraints?.readOnly) extras.push('readOnly');
+      if (f.constraints?.clamp) extras.push(`clamp[${f.constraints.clamp[0]},${f.constraints.clamp[1]}]`);
+      if (f.constraints?.enumValues?.length) extras.push(`enum[${f.constraints.enumValues.join(',')}]`);
+      if (f.defaultValue !== undefined) extras.push(`default=${JSON.stringify(f.defaultValue)}`);
+
+      const extrasStr = extras.length ? ` (${extras.join(', ')})` : '';
+      lines.push(`${pad}${name}: ${f.type}${f.label !== name ? ` [label: "${f.label}"]` : ''}${extrasStr}`);
+
+      if (f.children?.length) {
+        walk(f.children, indent + 1);
+      }
+    }
+  }
+
+  walk(schema.fields, 0);
+  return lines.join('\n');
+}
+
+function collectLeafFields(fields: MVUZODField[]): MVUZODField[] {
+  const result: MVUZODField[] = [];
+  function collect(ff: MVUZODField[]) {
+    for (const f of ff) {
+      if (f.children?.length) collect(f.children);
+      else result.push(f);
+    }
+  }
+  collect(fields);
+  return result;
+}

@@ -73,13 +73,13 @@ export function materializeEntry(
     ? getPreset(config.category, config.cardType ?? 'single')
     : undefined;
 
-  // Preset có → dùng preset defaults, config có → override preset, không có → fallback
-  const posExt = config.defaultPosition ?? preset?.defaults.position ?? 0;
+  // Priority: AI per-entry > config default > preset > fallback
+  const posExt = ai.position ?? config.defaultPosition ?? preset?.defaults.position ?? 0;
   const constant = ai.constant ?? preset?.defaults.constant ?? false;
   const selective = ai.selective ?? preset?.defaults.selective ?? true;
-  const depth = config.defaultDepth ?? preset?.defaults.depth ?? 4;
-  const role = config.defaultRole ?? preset?.defaults.role ?? null;
-  const scanDepth = config.scanDepth ?? preset?.defaults.scan_depth ?? 2;
+  const depth = ai.depth ?? config.defaultDepth ?? preset?.defaults.depth ?? 4;
+  const role = ai.role !== undefined ? ai.role : (config.defaultRole ?? preset?.defaults.role ?? null);
+  const scanDepth = ai.scan_depth ?? config.scanDepth ?? preset?.defaults.scan_depth ?? 2;
   const insertionOrder = ai.insertion_order
     ?? config.insertionOrderStart
     ?? preset?.defaults.insertion_order
