@@ -93,7 +93,7 @@ CHỈ trả về MỘT MẢNG JSON hợp lệ. KHÔNG thêm giải thích, KHÔN
 
 // ─── AUTO-CONFIG ADDON (chỉ inject khi autoConfig=true) ──────────────────
 
-const AUTO_CONFIG_ADDON = `
+export const AUTO_CONFIG_ADDON = `
 
 --- AUTO-CONFIG PER ENTRY (QUAN TRỌNG — ĐỌC KỸ) ---
 
