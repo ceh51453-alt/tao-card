@@ -226,3 +226,135 @@ export function validateGameRegexScripts(
     issues,
   };
 }
+
+// ─── JSON REPAIR FOR CONTINUATION ───────────────────────────────────────────
+
+/**
+ * Repair concatenated JSON chunks from multi-call AI responses.
+ * Handles: duplicate fragments, unclosed brackets, trailing commas.
+ */
+export function repairConcatenatedJson(chunks: string[]): string {
+  if (chunks.length === 0) return '';
+  if (chunks.length === 1) return chunks[0];
+
+  // Strategy 1: Try the full concatenation first (AI might have continued perfectly)
+  let combined = chunks.join('');
+
+  // Try parse directly
+  try {
+    JSON.parse(combined);
+    return combined;
+  } catch { /* continue repair */ }
+
+  // Strategy 2: Extract JSON object from the combined text
+  const objMatch = combined.match(/\{[\s\S]+\}/);
+  if (objMatch) {
+    try {
+      JSON.parse(objMatch[0]);
+      return objMatch[0];
+    } catch { /* continue */ }
+  }
+
+  // Strategy 3: Smart merge — find overlap between chunks and deduplicate
+  combined = smartMergeChunks(chunks);
+
+  // Strategy 4: Fix common structural issues
+  combined = fixJsonStructure(combined);
+
+  return combined;
+}
+
+/**
+ * Smart merge: detect if AI repeated part of previous output and deduplicate.
+ */
+function smartMergeChunks(chunks: string[]): string {
+  let result = chunks[0];
+
+  for (let i = 1; i < chunks.length; i++) {
+    const chunk = chunks[i];
+
+    // Check if chunk starts with content that overlaps with end of result
+    // Look for overlap in the last 200 chars of result vs first 200 chars of chunk
+    const overlapWindow = Math.min(200, result.length, chunk.length);
+    let bestOverlap = 0;
+
+    for (let len = 10; len <= overlapWindow; len++) {
+      const tail = result.slice(-len);
+      if (chunk.startsWith(tail)) {
+        bestOverlap = len;
+      }
+    }
+
+    if (bestOverlap > 10) {
+      // Found overlap — skip the duplicated part
+      result += chunk.slice(bestOverlap);
+    } else {
+      result += chunk;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Fix common JSON structural issues in concatenated responses.
+ */
+function fixJsonStructure(text: string): string {
+  let fixed = text.trim();
+
+  // Remove markdown fences
+  fixed = fixed.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?\s*```\s*$/, '');
+  fixed = fixed.trim();
+
+  // Fix trailing commas before closing brackets
+  fixed = fixed.replace(/,\s*([}\]])/g, '$1');
+
+  // Count open/close braces and brackets
+  let braces = 0;
+  let brackets = 0;
+  let inString = false;
+  let escape = false;
+
+  for (const ch of fixed) {
+    if (escape) { escape = false; continue; }
+    if (ch === '\\') { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === '{') braces++;
+    if (ch === '}') braces--;
+    if (ch === '[') brackets++;
+    if (ch === ']') brackets--;
+  }
+
+  // Close unclosed brackets/braces
+  // Remove any trailing comma before we close
+  fixed = fixed.replace(/,\s*$/, '');
+
+  while (brackets > 0) { fixed += ']'; brackets--; }
+  while (braces > 0) { fixed += '}'; braces--; }
+
+  return fixed;
+}
+
+/**
+ * Count approximate number of scripts in a partial/incomplete JSON response.
+ * Uses "scriptName" field occurrences as a proxy.
+ */
+export function countScriptsInPartial(text: string): number {
+  const matches = text.match(/"scriptName"\s*:\s*"/g);
+  return matches ? matches.length : 0;
+}
+
+/**
+ * Get expected script count range for a component type.
+ */
+export function getExpectedScriptCount(component: string): { min: number; max: number } {
+  switch (component) {
+    case 'status_bar': return { min: 2, max: 4 };
+    case 'opening_form': return { min: 2, max: 3 };
+    case 'game_screen': return { min: 3, max: 5 };
+    case 'full_set': return { min: 6, max: 15 };
+    case 'free_form': return { min: 1, max: 20 };
+    default: return { min: 1, max: 10 };
+  }
+}

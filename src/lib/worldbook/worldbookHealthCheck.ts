@@ -19,6 +19,7 @@ export interface HealthWarning {
   autoFixable: boolean;
   fix?: {
     // Entry-level patches
+    id?: number;
     keys?: string[];
     secondary_keys?: string[];
     constant?: boolean;
@@ -60,8 +61,29 @@ export async function checkWorldbookHealth(
   cardType: CardType,
 ): Promise<HealthReport> {
   const items: HealthWarning[] = [];
+  const seenIds = new Set<number>();
+  let currentMaxId = entries.length > 0 ? Math.max(...entries.map(e => e.id)) : 0;
 
   for (const entry of entries) {
+    // ─── 0. Check duplicate UID ──────────────────────────────────────
+    if (seenIds.has(entry.id)) {
+      currentMaxId++;
+      items.push({
+        entryId: entry.id,
+        comment: entry.comment,
+        level: 'error',
+        code: 'DUPLICATE_UID',
+        message: `Bị trùng mã UID (${entry.id}) với mục khác. Gây lỗi khi xóa hoặc cập nhật.`,
+        autoFixable: true,
+        fix: { 
+          id: currentMaxId,
+          extensions: { display_index: currentMaxId }
+        },
+      });
+    } else {
+      seenIds.add(entry.id);
+    }
+
     if (!entry.enabled) continue; // Skip disabled entries
 
     const ext = entry.extensions;

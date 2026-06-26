@@ -120,6 +120,7 @@ export function buildGameRegexUserPrompt(
   existingRegexScripts: RegexScript[],
   customInstructions?: string,
   uiConfig?: GameUIConfig,
+  referenceJson?: string,
 ): string {
   const parts: string[] = [];
 
@@ -150,6 +151,14 @@ Nếu đã có scripts render <StatusPlaceHolderImpl/>, KHÔNG tạo lại.`);
   // 5. Custom instructions from user (skip for free_form — already embedded in step 3)
   if (component !== 'free_form' && customInstructions?.trim()) {
     parts.push(`=== YÊU CẦU BỔ SUNG TỪ NGƯỜI DÙNG ===\n${customInstructions.trim()}`);
+  }
+
+  // 6. Reference JSON file (user-uploaded)
+  if (referenceJson?.trim()) {
+    parts.push(`=== DỮ LIỆU THAM KHẢO (JSON do người dùng cung cấp) ===
+Dưới đây là file JSON tham khảo. Hãy sử dụng cấu trúc, style, pattern trong file này để tạo regex scripts phù hợp.
+
+${referenceJson.trim().slice(0, 30000)}`);
   }
 
   return parts.join('\n\n');

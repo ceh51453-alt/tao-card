@@ -247,7 +247,13 @@ export function executeAction(
   updateField: (path: string, value: unknown) => void,
   safeMode: boolean = false
 ): void {
-  const entries = card.data.character_book?.entries ?? [];
+  if (!card.data.character_book) {
+    card.data.character_book = { name: card.data.name, entries: [] };
+  }
+  if (!card.data.character_book.entries) {
+    card.data.character_book.entries = [];
+  }
+  const entries = card.data.character_book.entries;
   // Build lookup Set for duplicate check (O(1))
   const existingComments = new Set(entries.map(e => e.comment.trim().toLowerCase()));
 
@@ -269,6 +275,7 @@ export function executeAction(
       };
       const entry = materializeEntry(patch, {}, id);
       addEntry(entry);
+      entries.push(entry);
       break;
     }
     case 'update_entry': {

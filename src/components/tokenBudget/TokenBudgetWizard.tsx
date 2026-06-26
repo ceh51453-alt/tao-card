@@ -42,6 +42,15 @@ export function TokenBudgetWizard() {
   const entries = useMemo(() => card.data.character_book?.entries ?? [], [card]);
   const totalTokensEstimate = useMemo(() => Math.ceil(entries.reduce((s, e) => s + (e.content?.length ?? 0), 0) / 4), [entries]);
 
+  // Read existing MVUZOD schema from card
+  const mvuzodSchema = useMemo(() => {
+    const ext = card.data.extensions as unknown as Record<string, unknown>;
+    if (ext?.mvuzod) {
+      return (ext.mvuzod as Record<string, unknown>).schema as import('../../types/mvuzod.types').MVUZODSchema ?? null;
+    }
+    return null;
+  }, [card]);
+
   // ─── Config state ───────────────────────────────────────────────────
   const [config, setConfig] = useState<TctrlAnalysisConfig>({
     ...DEFAULT_TCTRL_CONFIG,
@@ -126,12 +135,25 @@ export function TokenBudgetWizard() {
       // ═══ PHASE 2: Local Grouping ═══
       addLog('\n━━━ PHASE 2: Xây dựng nhóm & phân bổ budget ━━━');
       setProgress(prev => prev ? { ...prev, phase: 'group' } : null);
-      const analysis = buildGroupsFromAnalysis(analyzed, config);
+      const analysis = buildGroupsFromAnalysis(analyzed, config, mvuzodSchema);
 
       addLog(`📊 ${analysis.groups.length} nhóm tạo:`);
       for (const group of analysis.groups) {
         addLog(`  ├─ ${group.name}: ${group.entries.length} entries, ~${group.totalTokens.toLocaleString()} tokens [${group.strategy}]`);
       }
+
+      // Log detected variables
+      if (analysis.variables.length > 0) {
+        addLog(`\n🔗 Biến điều khiển phát hiện (${analysis.variables.length}):`);
+        for (const v of analysis.variables) {
+          const icon = v.source === 'mvuzod' ? '🔗' : '🆕';
+          addLog(`  ${icon} ${v.name} (${v.source}) → ${v.getvarPath} → ${v.affectedEntries.length} entries`);
+          if (v.possibleValues.length > 0) {
+            addLog(`     Giá trị: ${v.possibleValues.slice(0, 5).join(', ')}${v.possibleValues.length > 5 ? '...' : ''}`);
+          }
+        }
+      }
+
       for (const rec of analysis.recommendations) {
         addLog(`  ${rec}`);
       }
@@ -186,7 +208,7 @@ export function TokenBudgetWizard() {
     } finally {
       setIsRunning(false);
     }
-  }, [activeProfile, entries, card, config, settings.generationParams, createSnapshot, addEntry, updateEntry, addLog]);
+  }, [activeProfile, entries, card, config, settings.generationParams, createSnapshot, addEntry, updateEntry, addLog, mvuzodSchema]);
 
   const handlePause = useCallback(() => {
     ctxRef.current.paused = !ctxRef.current.paused;

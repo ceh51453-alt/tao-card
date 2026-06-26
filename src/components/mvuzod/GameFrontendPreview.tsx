@@ -11,7 +11,7 @@ import {
   LayoutGrid, FormInput, Monitor, Layers,
   Wand2, Loader2, AlertTriangle, CheckCircle2,
   Plus, Trash2, ChevronDown, ChevronRight,
-  Sparkles, XCircle,
+  Sparkles, XCircle, FileUp, X,
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import type { MVUZODSchema } from '../../types/mvuzod.types';
@@ -23,6 +23,9 @@ import { GAME_REGEX_SYSTEM_PROMPT, buildGameRegexUserPrompt } from '../../prompt
 import {
   parseGameRegexResponse,
   validateGameRegexScripts,
+  repairConcatenatedJson,
+  countScriptsInPartial,
+  getExpectedScriptCount,
   type ValidationIssue,
 } from '../../lib/mvuzod/gameRegexParser';
 import { GameUIConfigPanel } from './GameUIConfigPanel';
@@ -76,6 +79,8 @@ export function GameFrontendPreview({ schema }: GameFrontendPreviewProps) {
   const [customInstructions, setCustomInstructions] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [uiConfig, setUIConfig] = useState<GameUIConfig>(DEFAULT_GAME_UI_CONFIG);
+  const [referenceJson, setReferenceJson] = useState<string>('');
+  const [referenceFileName, setReferenceFileName] = useState<string>('');
 
   // Generation state
   const [generating, setGenerating] = useState(false);
@@ -133,6 +138,7 @@ export function GameFrontendPreview({ schema }: GameFrontendPreviewProps) {
         existingScripts,
         customInstructions.trim() || undefined,
         uiConfig,
+        referenceJson || undefined,
       );
 
       const messages: ChatMessage[] = [
@@ -152,16 +158,19 @@ export function GameFrontendPreview({ schema }: GameFrontendPreviewProps) {
         }
 
         try {
-          let fullText = '';
+          // ═══ PHASE 1: Multi-call continuation when truncated ═══
+          const chunks: string[] = [];
           let isTruncated = true;
           let callCount = 0;
-          const maxCalls = 3;
+          const maxCalls = 8; // Increased from 3 → 8 for large full_set generations
           let currentMessages = [...messages];
+          let totalOutputTokens = 0;
 
           while (isTruncated && callCount < maxCalls) {
             callCount++;
+            const partialCount = countScriptsInPartial(chunks.join(''));
             if (callCount > 1) {
-              setLoadingStatus(`Phản hồi bị chạm giới hạn token. Đang yêu cầu AI viết tiếp (lượt ${callCount})...`);
+              setLoadingStatus(`⏳ Phản hồi bị cắt — đang yêu cầu AI viết tiếp (lượt ${callCount}/${maxCalls}) — đã nhận ~${partialCount} scripts...`);
             }
 
             const response = await callAI({
@@ -174,44 +183,134 @@ export function GameFrontendPreview({ schema }: GameFrontendPreviewProps) {
               messages: currentMessages,
             });
 
-            fullText += response.text;
+            chunks.push(response.text);
             const reason = response.finishReason;
             const usage = response.usage;
+            if (usage) totalOutputTokens += usage.completion_tokens ?? 0;
 
+            const currentPartialCount = countScriptsInPartial(chunks.join(''));
             if (usage) {
-              setLoadingStatus(`Lượt ${callCount}: ${usage.prompt_tokens}t input → ${usage.completion_tokens}t output (finish: ${reason ?? 'STOP'})`);
+              setLoadingStatus(`Lượt ${callCount}: ${usage.prompt_tokens}t in → ${usage.completion_tokens}t out (finish: ${reason ?? 'STOP'}) — ~${currentPartialCount} scripts`);
             }
 
             isTruncated = ['MAX_TOKENS', 'max_tokens', 'length'].includes(reason || '');
 
             if (isTruncated && response.text.trim()) {
+              // Smart continuation prompt — include context about what we already have
+              const lastChars = response.text.trim().slice(-80);
               currentMessages = [
                 ...currentMessages,
                 { role: 'assistant', content: response.text },
-                { role: 'user', content: 'Viết tiếp phần JSON bị bỏ dở, BẮT ĐẦU NGAY sau phần cuối cùng. KHÔNG viết lại phần đã có.' },
+                { role: 'user', content: `JSON bị cắt giữa chừng. Đã nhận ~${currentPartialCount} scripts. Viết tiếp ĐÚNG vị trí bị cắt.\n\nPhần cuối bạn đã viết:\n...${lastChars}\n\nTIẾP TỤC NGAY SAU ĐÓ — KHÔNG viết lại phần đã có, KHÔNG thêm giải thích.` },
               ];
             } else {
               isTruncated = false;
             }
           }
 
-          setLoadingStatus('Đang phân tích phản hồi AI...');
+          // ═══ PHASE 2: Repair & Parse ═══
+          setLoadingStatus(`Đang sửa chữa và phân tích ${chunks.length} phần phản hồi (${totalOutputTokens} tokens)...`);
 
-          const parsed = parseGameRegexResponse(fullText);
-          const validation = validateGameRegexScripts(parsed.scripts);
+          const repairedText = chunks.length > 1
+            ? repairConcatenatedJson(chunks)
+            : chunks[0];
 
-          setGeneratedScripts(parsed.scripts);
+          const parsed = parseGameRegexResponse(repairedText);
+
+          // ═══ PHASE 3: Post-generation verification — request missing scripts ═══
+          const allScripts = [...parsed.scripts];
+          const expected = getExpectedScriptCount(selectedComponent);
+
+          if (selectedComponent !== 'free_form' && allScripts.length < expected.min) {
+            setLoadingStatus(`⚠️ Chỉ nhận được ${allScripts.length}/${expected.min} scripts tối thiểu. Đang gọi AI bổ sung...`);
+
+            const existingNames = allScripts.map(s => s.scriptName).join(', ');
+            const supplementMessages: ChatMessage[] = [
+              { role: 'system', content: GAME_REGEX_SYSTEM_PROMPT },
+              { role: 'user', content: userPrompt },
+              { role: 'assistant', content: JSON.stringify({ scripts: allScripts, explanation: parsed.explanation }) },
+              {
+                role: 'user',
+                content: `Bạn đã tạo ${allScripts.length} scripts: [${existingNames}].\n` +
+                  `Thành phần "${selectedComponent}" cần TỐI THIỂU ${expected.min} scripts.\n` +
+                  `Hãy tạo THÊM các scripts còn thiếu. CHỈ trả về JSON với scripts MỚI, KHÔNG lặp lại scripts đã có.\n` +
+                  `Format: { "scripts": [...], "explanation": "..." }`,
+              },
+            ];
+
+            // Up to 2 supplement calls
+            for (let supCall = 0; supCall < 2 && allScripts.length < expected.min; supCall++) {
+              try {
+                const supChunks: string[] = [];
+                let supTruncated = true;
+                let supCallCount = 0;
+                let supMessages = [...supplementMessages];
+
+                while (supTruncated && supCallCount < 4) {
+                  supCallCount++;
+                  if (supCallCount > 1) {
+                    setLoadingStatus(`🔄 Bổ sung lượt ${supCall + 1} — nối tiếp (${supCallCount}/4)...`);
+                  }
+
+                  const supResponse = await callAI({
+                    profile: activeProfile,
+                    params: { ...params, temperature: 0.3, useJsonResponseFormat: true },
+                    messages: supMessages,
+                  });
+
+                  supChunks.push(supResponse.text);
+                  supTruncated = ['MAX_TOKENS', 'max_tokens', 'length'].includes(supResponse.finishReason || '');
+
+                  if (supTruncated && supResponse.text.trim()) {
+                    const lastPart = supResponse.text.trim().slice(-80);
+                    supMessages = [
+                      ...supMessages,
+                      { role: 'assistant', content: supResponse.text },
+                      { role: 'user', content: `Tiếp tục JSON bị cắt. Phần cuối:\n...${lastPart}\nTIẾP TỤC NGAY — KHÔNG viết lại.` },
+                    ];
+                  } else {
+                    supTruncated = false;
+                  }
+                }
+
+                const supRepaired = supChunks.length > 1
+                  ? repairConcatenatedJson(supChunks)
+                  : supChunks[0];
+
+                const supParsed = parseGameRegexResponse(supRepaired);
+
+                // Merge — only add scripts with new names
+                const existingNameSet = new Set(allScripts.map(s => s.scriptName));
+                for (const script of supParsed.scripts) {
+                  if (!existingNameSet.has(script.scriptName)) {
+                    allScripts.push(script);
+                    existingNameSet.add(script.scriptName);
+                  }
+                }
+
+                setLoadingStatus(`✅ Bổ sung thành công — tổng cộng ${allScripts.length} scripts`);
+              } catch {
+                setLoadingStatus(`⚠️ Không thể bổ sung thêm scripts. Sử dụng ${allScripts.length} scripts đã có.`);
+                break;
+              }
+            }
+          }
+
+          // ═══ PHASE 4: Validate & present results ═══
+          const validation = validateGameRegexScripts(allScripts);
+
+          setGeneratedScripts(allScripts);
           setExplanation(parsed.explanation);
           setValidationIssues(validation.issues);
 
           if (!validation.valid) {
-            setLoadingStatus(`Tạo ${parsed.scripts.length} scripts nhưng có ${validation.issues.filter(i => i.severity === 'error').length} lỗi cần xem xét.`);
+            setLoadingStatus(`Tạo ${allScripts.length} scripts nhưng có ${validation.issues.filter(i => i.severity === 'error').length} lỗi cần xem xét.`);
           } else {
-            setLoadingStatus(`Tạo thành công ${parsed.scripts.length} regex scripts!`);
+            setLoadingStatus(`✅ Tạo thành công ${allScripts.length} regex scripts! (${totalOutputTokens} tokens, ${callCount} lượt gọi)`);
           }
 
           // Expand all by default
-          setExpandedScripts(new Set(parsed.scripts.map((_, i) => i)));
+          setExpandedScripts(new Set(allScripts.map((_, i) => i)));
 
           lastError = null;
           break; // Success
@@ -226,7 +325,7 @@ export function GameFrontendPreview({ schema }: GameFrontendPreviewProps) {
     } finally {
       setGenerating(false);
     }
-  }, [schema, selectedComponent, existingScripts, customInstructions, uiConfig]);
+  }, [schema, selectedComponent, existingScripts, customInstructions, uiConfig, referenceJson]);
 
   // ─── Apply Handler ───
   const handleApply = useCallback(() => {
@@ -396,6 +495,69 @@ Bạn có thể viết tự do — AI sẽ tạo regex scripts theo mô tả.`}
           )}
         </div>
       )}
+
+      {/* JSON Reference File Upload */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-1.5">
+          <FileUp className="w-3.5 h-3.5 text-cyan-400" />
+          <span className="text-xs font-medium text-cyan-300">File JSON tham khảo</span>
+          <span className="text-[10px] text-muted-foreground">(tuỳ chọn)</span>
+        </div>
+
+        {referenceJson ? (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-cyan-500/30 bg-cyan-500/5">
+            <FileUp className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+            <span className="text-[11px] text-cyan-300 truncate flex-1">{referenceFileName}</span>
+            <span className="text-[9px] text-muted-foreground">
+              {(referenceJson.length / 1024).toFixed(1)} KB
+            </span>
+            <button
+              onClick={() => { setReferenceJson(''); setReferenceFileName(''); }}
+              disabled={generating}
+              className="p-0.5 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors"
+              title="Xóa file tham khảo"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        ) : (
+          <label className={`flex items-center justify-center gap-2 px-3 py-3 rounded-lg border-2 border-dashed
+            border-border/50 hover:border-cyan-500/30 hover:bg-cyan-500/5
+            text-muted-foreground hover:text-cyan-400 transition-all cursor-pointer
+            ${generating ? 'opacity-50 pointer-events-none' : ''}`}
+          >
+            <FileUp className="w-4 h-4" />
+            <span className="text-[11px]">Chọn file .json để gửi kèm cho AI tham khảo</span>
+            <input
+              type="file"
+              accept=".json,application/json"
+              className="hidden"
+              disabled={generating}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                try {
+                  const text = await file.text();
+                  // Validate JSON
+                  JSON.parse(text);
+                  setReferenceJson(text);
+                  setReferenceFileName(file.name);
+                } catch {
+                  setReferenceJson(text => text); // keep old
+                  setError(`File "${file.name}" không phải JSON hợp lệ.`);
+                }
+                e.target.value = ''; // reset input
+              }}
+            />
+          </label>
+        )}
+
+        {referenceJson && (
+          <p className="text-[10px] text-muted-foreground/60 ml-5">
+            AI sẽ tham khảo cấu trúc, style và pattern từ file này khi tạo regex scripts
+          </p>
+        )}
+      </div>
 
       {/* Generate button */}
       <div className="flex items-center gap-3">

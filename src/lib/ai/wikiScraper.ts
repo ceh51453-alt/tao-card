@@ -319,6 +319,13 @@ function sleep(ms: number) {
  * pause/resume, retry logic, and concurrent batches.
  */
 export async function runWikiScrape(config: WikiScrapeConfig, ctx: WikiScrapeContext) {
+  if (!ctx.card.data.character_book) {
+    ctx.card.data.character_book = { name: ctx.card.data.name, entries: [] };
+  }
+  if (!ctx.card.data.character_book.entries) {
+    ctx.card.data.character_book.entries = [];
+  }
+  
   let created = 0;
   let consecutiveErrors = 0;
   const seen: Array<{ comment: string; keys: string[] }> = (
@@ -430,7 +437,6 @@ export async function runWikiScrape(config: WikiScrapeConfig, ctx: WikiScrapeCon
       }
 
       // Web search
-      let webInjection = '';
       if (config.useWebSearch) {
         const searchQuery = seen.length > 0
           ? `${wikiData.title} ${seen[seen.length - 1].comment}`
@@ -438,8 +444,8 @@ export async function runWikiScrape(config: WikiScrapeConfig, ctx: WikiScrapeCon
         ctx.log(`🌐 [Chunk ${chunkIdx + 1}] Đang cào dữ liệu web cho: "${searchQuery}"...`);
         const searchResults = await cascadeSearch(searchQuery, profile.webSearchProxyUrl);
         if (searchResults.length > 0) {
-          webInjection = searchResults.map(r => `Nguồn: ${r.source}\nNội dung: ${r.content}`).join('\n\n');
-          parts.push(`### Kiến thức từ Web\n${webInjection}`);
+          const webInjectionText = searchResults.map(r => `Nguồn: ${r.source}\nNội dung: ${r.content}`).join('\n\n');
+          parts.push(`### Kiến thức từ Web\n${webInjectionText}`);
         } else {
           ctx.log(`⚠️ [Chunk ${chunkIdx + 1}] Không tìm thấy thêm dữ liệu trên Web.`);
         }
@@ -533,6 +539,7 @@ export async function runWikiScrape(config: WikiScrapeConfig, ctx: WikiScrapeCon
         );
 
         ctx.appendEntry(entry);
+        ctx.card.data.character_book!.entries.push(entry);
         seen.push({ comment: entry.comment, keys: entry.keys });
         created++;
         batchCreated++;

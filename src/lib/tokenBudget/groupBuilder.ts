@@ -6,6 +6,7 @@
  */
 
 import type { AnalyzedEntry, TctrlAnalysisConfig } from './tokenAnalyzer';
+import type { MVUZODSchema, MVUZODField } from '../../types/mvuzod.types';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -38,11 +39,23 @@ export interface TctrlAnalysis {
   deadEntries: AnalyzedEntry[];
   duplicates: Array<{ keep: number; remove: number; comment: string }>;
   recommendations: string[];
+  variables: TctrlVariable[];
+  hasExistingSchema: boolean;
   stats: {
     byCategory: Record<string, number>;
     byPriority: Record<string, number>;
     tokensByGroup: Record<string, number>;
   };
+}
+
+export interface TctrlVariable {
+  name: string;                    // "location", "era"
+  type: 'string' | 'number' | 'boolean';
+  getvarPath: string;              // "stat_data.Trạng thái thế giới.Khu vực" or "stat_data.@@tctrl.location"
+  defaultValue: string;
+  possibleValues: string[];
+  source: 'mvuzod' | 'auto';      // From schema vs auto-detected
+  affectedEntries: number[];
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -114,6 +127,7 @@ const HIERARCHY_RULES: HierarchyRule[] = [
 export function buildGroupsFromAnalysis(
   analyzed: AnalyzedEntry[],
   config: TctrlAnalysisConfig,
+  mvuzodSchema?: MVUZODSchema | null,
 ): TctrlAnalysis {
   const effectiveBudget = Math.floor(config.inputContext * config.targetBudgetPercent / 100);
 
@@ -285,6 +299,14 @@ export function buildGroupsFromAnalysis(
     recommendations.push(`📊 Nhóm "${largestGroup.name}" chiếm ${((largestGroup.totalTokens / totalTokens) * 100).toFixed(0)}% tổng token. Cân nhắc chia nhỏ.`);
   }
 
+  // Resolve variables
+  const hasExistingSchema = !!(mvuzodSchema && mvuzodSchema.fields.length > 0);
+  const variables = resolveVariables(analyzed, mvuzodSchema ?? null);
+
+  if (variables.length > 0) {
+    recommendations.push(`🔗 Phát hiện ${variables.length} biến điều khiển: ${variables.map(v => `${v.name}(${v.source})`).join(', ')}`);
+  }
+
   return {
     totalEntries: analyzed.length,
     totalTokens,
@@ -294,6 +316,120 @@ export function buildGroupsFromAnalysis(
     deadEntries,
     duplicates,
     recommendations,
+    variables,
+    hasExistingSchema,
     stats: { byCategory, byPriority, tokensByGroup },
   };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// VARIABLE RESOLUTION — Merge hints + MVUZOD schema
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Vietnamese → English name mapping for schema field matching
+const VARIABLE_FIELD_ALIASES: Record<string, string[]> = {
+  location: ['khu vực', 'vị trí', 'địa điểm', 'location', 'area', 'region', 'nơi'],
+  era: ['thời đại', 'thời kỳ', 'era', 'age', 'epoch', 'niên đại'],
+  time_of_day: ['thời gian', 'giờ', 'time', 'buổi', 'thời điểm'],
+  mood: ['tâm trạng', 'cảm xúc', 'mood', 'emotion', 'feeling'],
+  combat_state: ['chiến đấu', 'combat', 'battle', 'trận'],
+  quest_stage: ['nhiệm vụ', 'quest', 'mission', 'giai đoạn'],
+  relationship: ['quan hệ', 'relationship', 'hảo cảm', 'tình cảm'],
+};
+
+function findSchemaFieldForVariable(
+  variableName: string,
+  schema: MVUZODSchema,
+): { field: MVUZODField; path: string } | null {
+  const aliases = VARIABLE_FIELD_ALIASES[variableName] ?? [variableName];
+
+  // Recursive search through schema fields
+  function searchFields(fields: MVUZODField[], parentPath: string): { field: MVUZODField; path: string } | null {
+    for (const field of fields) {
+      const fieldName = field.path.split('/').pop()?.toLowerCase() ?? '';
+      const fieldLabel = field.label.toLowerCase();
+
+      // Match by name or label
+      for (const alias of aliases) {
+        if (fieldName.includes(alias.toLowerCase()) || fieldLabel.includes(alias.toLowerCase())) {
+          const fullPath = parentPath ? `${parentPath}.${field.path.split('/').pop()}` : `stat_data.${field.path.replace(/\//g, '.')}`;
+          return { field, path: fullPath };
+        }
+      }
+
+      // Search children
+      if (field.children?.length) {
+        const childPath = parentPath ? `${parentPath}.${field.path.split('/').pop()}` : `stat_data.${field.path.replace(/\//g, '.')}`;
+        const found = searchFields(field.children, childPath);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  return searchFields(schema.fields, '');
+}
+
+function resolveVariables(
+  analyzed: AnalyzedEntry[],
+  mvuzodSchema: MVUZODSchema | null,
+): TctrlVariable[] {
+  // Collect all control hints
+  const hintMap = new Map<string, {
+    entries: number[];
+    values: Set<string>;
+    conditions: string[];
+  }>();
+
+  for (const entry of analyzed) {
+    if (!entry.controlHint) continue;
+    const { variableName, matchValue, condition } = entry.controlHint;
+
+    if (!hintMap.has(variableName)) {
+      hintMap.set(variableName, { entries: [], values: new Set(), conditions: [] });
+    }
+    const data = hintMap.get(variableName)!;
+    data.entries.push(entry.entryId);
+    data.values.add(matchValue);
+    if (!data.conditions.includes(condition)) data.conditions.push(condition);
+  }
+
+  // Build variables with schema resolution
+  const variables: TctrlVariable[] = [];
+
+  for (const [name, data] of hintMap) {
+    // Try to find matching MVUZOD schema field
+    const schemaMatch = mvuzodSchema ? findSchemaFieldForVariable(name, mvuzodSchema) : null;
+
+    if (schemaMatch) {
+      // Kịch bản B: Reuse existing schema path
+      variables.push({
+        name,
+        type: schemaMatch.field.type === 'number' ? 'number'
+            : schemaMatch.field.type === 'boolean' ? 'boolean'
+            : 'string',
+        getvarPath: schemaMatch.path,
+        defaultValue: String(schemaMatch.field.defaultValue ?? ''),
+        possibleValues: Array.from(data.values),
+        source: 'mvuzod',
+        affectedEntries: data.entries,
+      });
+    } else {
+      // Kịch bản A/C: Create new @@tctrl variable
+      const type = data.conditions.some(c => c.includes('>') || c.includes('<')) ? 'number'
+                 : data.conditions.some(c => c.includes('true') || c.includes('false')) ? 'boolean'
+                 : 'string';
+      variables.push({
+        name,
+        type,
+        getvarPath: `stat_data.@@tctrl.${name}`,
+        defaultValue: type === 'number' ? '0' : type === 'boolean' ? 'false' : '',
+        possibleValues: Array.from(data.values),
+        source: 'auto',
+        affectedEntries: data.entries,
+      });
+    }
+  }
+
+  return variables;
 }

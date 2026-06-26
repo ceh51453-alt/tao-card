@@ -19,6 +19,8 @@ import {
   getPreset, getStrategyLabel,
   type EntryCategory, type CardType,
 } from '../../lib/worldbook/worldbookConfig';
+import { buildSchemaContextForBatch, getSchemaPreviewSummary } from '../../lib/mvuzod/schemaContextBuilder';
+import type { MVUZODSchema } from '../../types/mvuzod.types';
 
 const POSITION_LABELS: Record<number, string> = {
   0: '↑ Before Char', 1: '↓ After Char', 2: '📝 Top AN',
@@ -27,6 +29,7 @@ const POSITION_LABELS: Record<number, string> = {
 
 export function BatchGeneratorPanel() {
   const addEntry = useCardStore(s => s.addEntry);
+  const card = useCardStore(s => s.card);
   const settings = useSettingsStore();
 
   // ─── Config state ───────────────────────────────────────────────────
@@ -58,6 +61,7 @@ export function BatchGeneratorPanel() {
 
   const [useCardContext, setUseCardContext] = useState(true);
   const [useWebSearch, setUseWebSearch] = useState(false);
+  const [useSchemaContext, setUseSchemaContext] = useState(false);
   const [autoConfig, setAutoConfig] = useState(true);
   const [totalEntries, setTotalEntries] = useState(10);
   const [entriesPerBatch, setEntriesPerBatch] = useState(5);
@@ -91,6 +95,20 @@ export function BatchGeneratorPanel() {
   const totalBatches = useMemo(() => Math.ceil(totalEntries / entriesPerBatch), [totalEntries, entriesPerBatch]);
   const totalRounds = useMemo(() => Math.ceil(totalBatches / concurrentBatches), [totalBatches, concurrentBatches]);
   const activeProfile = useMemo(() => settings.profiles.find(p => p.id === settings.activeProfileId), [settings.profiles, settings.activeProfileId]);
+
+  // Read MVUZOD schema from card store
+  const mvuzodSchema = useMemo<MVUZODSchema | null>(() => {
+    const ext = card.data.extensions as unknown as Record<string, unknown>;
+    if (ext?.mvuzod) {
+      return (ext.mvuzod as Record<string, unknown>).schema as MVUZODSchema ?? null;
+    }
+    return null;
+  }, [card.data.extensions]);
+
+  const schemaPreview = useMemo(() => {
+    if (!mvuzodSchema) return null;
+    return getSchemaPreviewSummary(mvuzodSchema);
+  }, [mvuzodSchema]);
 
   const addLog = useCallback((msg: string) => {
     setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
@@ -143,6 +161,9 @@ export function BatchGeneratorPanel() {
           category: tab.category !== 'custom' ? tab.category : undefined,
           cardType: tab.cardType,
           autoConfig,
+          schemaContext: useSchemaContext && mvuzodSchema
+            ? buildSchemaContextForBatch(mvuzodSchema)
+            : undefined,
         };
 
         await runBatchGeneration(config, {
@@ -179,7 +200,7 @@ export function BatchGeneratorPanel() {
     
     setIsRunning(false);
     setIsVerifying(false);
-  }, [activeProfile, prompts, activeTab, TABS, useCardContext, useWebSearch, totalEntries, entriesPerBatch, concurrentBatches,
+  }, [activeProfile, prompts, activeTab, TABS, useCardContext, useWebSearch, useSchemaContext, mvuzodSchema, totalEntries, entriesPerBatch, concurrentBatches,
       defaultPosition, insertionOrderMode, insertionOrderStart, maxRetries,
       maxConsecErrors, modelOverride, autoConfig, settings.generationParams, addEntry, addLog, criteria]);
 
@@ -273,6 +294,31 @@ export function BatchGeneratorPanel() {
             className="settings-checkbox" disabled={isRunning} />
           🌐 Kích hoạt Tìm Kiếm Web Mỗi Lượt (SOTA Web Search)
         </label>
+
+        {/* Schema-aware toggle — only show when schema exists */}
+        {mvuzodSchema && schemaPreview && (
+          <div className={`rounded-lg border p-3 space-y-1.5 transition-colors ${
+            useSchemaContext
+              ? 'border-emerald-500/30 bg-emerald-500/5'
+              : 'border-border/50 bg-muted/10'
+          }`}>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={useSchemaContext} onChange={e => setUseSchemaContext(e.target.checked)}
+                className="settings-checkbox" disabled={isRunning} />
+              <span className={`font-medium ${useSchemaContext ? 'text-emerald-400' : 'text-muted-foreground'}`}>
+                🧬 Sinh entries dựa theo Schema biến (MVUZOD)
+              </span>
+            </label>
+            <p className={`text-[10px] ml-6 ${useSchemaContext ? 'text-emerald-400/70' : 'text-muted-foreground/60'}`}>
+              Schema hiện có: {schemaPreview.summary}
+            </p>
+            {useSchemaContext && (
+              <p className="text-[10px] ml-6 text-muted-foreground">
+                AI sẽ tạo entries có tham chiếu đến các biến trong schema (quan hệ, vật phẩm, trạng thái...)
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Entries config */}

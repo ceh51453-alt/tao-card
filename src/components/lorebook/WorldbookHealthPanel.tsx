@@ -28,7 +28,8 @@ export function WorldbookHealthPanel() {
 
   const handleFixOne = useCallback((item: HealthWarning) => {
     if (!item.fix) return;
-    const entry = entries.find(e => e.id === item.entryId);
+    const currentEntries = useCardStore.getState().card.data.character_book?.entries ?? [];
+    const entry = currentEntries.find(e => e.id === item.entryId);
     if (!entry) return;
 
     const { extensions: extPatch, ...entryPatch } = item.fix;
@@ -40,7 +41,7 @@ export function WorldbookHealthPanel() {
         : entry.extensions,
     };
     updateEntry(entry.id, updated);
-  }, [entries, updateEntry]);
+  }, [updateEntry]);
 
   const handleFixAll = useCallback(() => {
     for (const item of fixableItems) {

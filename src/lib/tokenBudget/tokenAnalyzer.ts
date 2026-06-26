@@ -45,6 +45,11 @@ export interface AnalyzedEntry {
   isDead: boolean;
   duplicateOf: number | null;
   reason: string;
+  controlHint?: {
+    variableName: string;    // "location" | "era" | "mood" | "quest_stage" | ...
+    condition: string;       // "=== 'Khu rừng'" | "> 50"
+    matchValue: string;      // "Khu rừng", "50"
+  };
 }
 
 export interface TctrlProgress {
@@ -93,9 +98,13 @@ Với MỖI entry, xác định:
 6. isDead: true nếu: entry có content rỗng, HOẶC không có keys và không constant, HOẶC nội dung vô nghĩa
 7. duplicateOf: ID entry khác nếu nội dung gần giống (>80% overlap) — null nếu không trùng
 8. reason: 1 dòng ngắn giải thích phân loại
+9. controlHint: Gợi ý biến điều khiển entry này. null nếu entry luôn bật hoặc chỉ cần keyword matching.
+   - variableName: tên biến ngắn gọn bằng tiếng Anh (location, era, mood, quest_stage, time_of_day, combat_state, relationship)
+   - condition: điều kiện EJS bật entry ("=== 'Khu rừng'" hoặc "> 50" hoặc "=== true")
+   - matchValue: giá trị tương ứng ("Khu rừng", "50", "true")
 
 CHỈ trả về JSON array. KHÔNG markdown, KHÔNG giải thích bên ngoài.
-[{"entryId":1,"category":"character","xmlTag":"<Character>","priority":"high","groupSuggestion":"Nhân vật chính","isDead":false,"duplicateOf":null,"reason":"Main character entry with full description"}]`;
+[{"entryId":1,"category":"character","xmlTag":"<Character>","priority":"high","groupSuggestion":"Nhân vật chính","isDead":false,"duplicateOf":null,"reason":"Main character entry","controlHint":null}]`;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // LOCAL FALLBACK ANALYZER (khi AI fail)
@@ -169,7 +178,69 @@ export function analyzeLocal(entry: LorebookEntry): AnalyzedEntry {
     isDead,
     duplicateOf: null, // Local không detect duplicate
     reason: `Local: ${catResult.category} (confidence ${catResult.confidence.toFixed(2)})`,
+    controlHint: detectControlHintLocal(entry, catResult.category, xmlTag),
   };
+}
+
+// ─── Heuristic variable detection ───────────────────────────────────────
+
+const VARIABLE_HEURISTICS: Array<{
+  variableName: string;
+  patterns: RegExp[];
+  extractor: (match: RegExpMatchArray) => { condition: string; matchValue: string };
+}> = [
+  {
+    variableName: 'era',
+    patterns: [/(?:cổ đại|thời cổ|ancient|medieval)/i, /(?:hiện đại|modern|contemporary)/i, /(?:tương lai|futuristic|sci-?fi)/i],
+    extractor: (m) => ({ condition: `=== '${m[0]}'`, matchValue: m[0] }),
+  },
+  {
+    variableName: 'time_of_day',
+    patterns: [/(?:ban đêm|đêm tối|night|midnight)/i, /(?:ban ngày|buổi sáng|dawn|morning|daytime)/i, /(?:hoàng hôn|chiều tối|dusk|evening)/i],
+    extractor: (m) => ({ condition: `=== '${m[0]}'`, matchValue: m[0] }),
+  },
+  {
+    variableName: 'mood',
+    patterns: [/(?:giận dữ|tức giận|angry|rage)/i, /(?:buồn bã|đau khổ|sad|sorrow)/i, /(?:vui vẻ|hạnh phúc|happy|joy)/i, /(?:sợ hãi|hoảng loạn|fear|panic)/i],
+    extractor: (m) => ({ condition: `=== '${m[0]}'`, matchValue: m[0] }),
+  },
+  {
+    variableName: 'combat_state',
+    patterns: [/(?:chiến đấu|combat|battle|fight)/i, /(?:an toàn|peaceful|safe)/i],
+    extractor: (m) => ({ condition: '=== true', matchValue: 'true' }),
+  },
+];
+
+function detectControlHintLocal(
+  entry: LorebookEntry,
+  category: AutoCategory,
+  xmlTag: string | null,
+): AnalyzedEntry['controlHint'] {
+  // System/EJS/MVU entries → no control hint
+  if (category === 'system' || category === 'ejs' || category === 'mvu' || category === 'rule') return undefined;
+  // Constant entries → no hint (they're always on)
+  if (entry.constant) return undefined;
+
+  // Location entries → variable "location"
+  if (category === 'location' || xmlTag === '<Location>' || xmlTag === '<Area>') {
+    const locationName = entry.comment || entry.keys[0] || '';
+    if (locationName) {
+      return { variableName: 'location', condition: `=== '${locationName}'`, matchValue: locationName };
+    }
+  }
+
+  // Check content against heuristics
+  const content = entry.content;
+  for (const heuristic of VARIABLE_HEURISTICS) {
+    for (const pattern of heuristic.patterns) {
+      const match = content.match(pattern);
+      if (match) {
+        return { variableName: heuristic.variableName, ...heuristic.extractor(match) };
+      }
+    }
+  }
+
+  return undefined;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -230,18 +301,34 @@ function validateAnalyzedEntries(arr: unknown[]): AnalyzedEntry[] {
 
   return arr.filter((item): item is Record<string, unknown> =>
     typeof item === 'object' && item !== null && 'entryId' in item
-  ).map(item => ({
-    entryId: Number(item.entryId),
-    comment: String(item.comment ?? ''),
-    category: (validCategories.includes(String(item.category)) ? String(item.category) : 'uncategorized') as AutoCategory,
-    xmlTag: typeof item.xmlTag === 'string' ? item.xmlTag : null,
-    priority: (validPriorities.includes(String(item.priority)) ? String(item.priority) : 'medium') as AnalyzedEntry['priority'],
-    tokenEstimate: typeof item.tokenEstimate === 'number' ? item.tokenEstimate : 0,
-    groupSuggestion: String(item.groupSuggestion ?? 'Uncategorized'),
-    isDead: Boolean(item.isDead),
-    duplicateOf: typeof item.duplicateOf === 'number' ? item.duplicateOf : null,
-    reason: String(item.reason ?? ''),
-  }));
+  ).map(item => {
+    // Parse controlHint
+    let controlHint: AnalyzedEntry['controlHint'] = undefined;
+    if (item.controlHint && typeof item.controlHint === 'object') {
+      const h = item.controlHint as Record<string, unknown>;
+      if (h.variableName && h.condition && h.matchValue) {
+        controlHint = {
+          variableName: String(h.variableName),
+          condition: String(h.condition),
+          matchValue: String(h.matchValue),
+        };
+      }
+    }
+
+    return {
+      entryId: Number(item.entryId),
+      comment: String(item.comment ?? ''),
+      category: (validCategories.includes(String(item.category)) ? String(item.category) : 'uncategorized') as AutoCategory,
+      xmlTag: typeof item.xmlTag === 'string' ? item.xmlTag : null,
+      priority: (validPriorities.includes(String(item.priority)) ? String(item.priority) : 'medium') as AnalyzedEntry['priority'],
+      tokenEstimate: typeof item.tokenEstimate === 'number' ? item.tokenEstimate : 0,
+      groupSuggestion: String(item.groupSuggestion ?? 'Uncategorized'),
+      isDead: Boolean(item.isDead),
+      duplicateOf: typeof item.duplicateOf === 'number' ? item.duplicateOf : null,
+      reason: String(item.reason ?? ''),
+      controlHint,
+    };
+  });
 }
 
 function isRateLimitError(err: unknown): boolean {

@@ -9,7 +9,7 @@ import type { LorebookEntry } from '../../types/lorebook.types';
 import type { ChatMessage } from '../../types';
 import { callAI } from '../ai/client';
 import { DEFAULT_ENTRY_EXT } from '../../types/lorebook.types';
-import type { TctrlAnalysis, TctrlGroup } from './groupBuilder';
+import type { TctrlAnalysis, TctrlGroup, TctrlVariable } from './groupBuilder';
 import type { AnalyzedEntry, TctrlProgress, TctrlRunContext } from './tokenAnalyzer';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -94,6 +94,32 @@ function generateFallbackGateKeeper(analysis: TctrlAnalysis): string {
     '',
   ];
 
+  // Variable declarations
+  if (analysis.variables.length > 0) {
+    const mvuzodVars = analysis.variables.filter(v => v.source === 'mvuzod');
+    const autoVars = analysis.variables.filter(v => v.source === 'auto');
+
+    if (mvuzodVars.length > 0) {
+      lines.push('// ═══ BIẾN TỪ MVUZOD SCHEMA ═══');
+      for (const v of mvuzodVars) {
+        const safeName = '_' + v.name.replace(/[^a-zA-Z0-9_]/g, '_');
+        const defaultVal = v.type === 'number' ? v.defaultValue : `'${v.defaultValue}'`;
+        lines.push(`if (typeof ${safeName} === 'undefined') var ${safeName} = getvar('${v.getvarPath}', { defaults: ${defaultVal} });`);
+      }
+      lines.push('');
+    }
+
+    if (autoVars.length > 0) {
+      lines.push('// ═══ BIẾN AUTO-DETECT (@@tctrl) ═══');
+      for (const v of autoVars) {
+        const safeName = '_' + v.name.replace(/[^a-zA-Z0-9_]/g, '_');
+        const defaultVal = v.type === 'number' ? v.defaultValue : v.type === 'boolean' ? v.defaultValue : `'${v.defaultValue}'`;
+        lines.push(`if (typeof ${safeName} === 'undefined') var ${safeName} = getvar('${v.getvarPath}', { defaults: ${defaultVal} });`);
+      }
+      lines.push('');
+    }
+  }
+
   // Overview of groups
   for (const group of analysis.groups) {
     lines.push(`// ${group.name}: ${group.entries.length} entries, ~${group.totalTokens.toLocaleString()} tokens [${group.strategy}]`);
@@ -105,7 +131,8 @@ function generateFallbackGateKeeper(analysis: TctrlAnalysis): string {
 
 function generateFallbackGroupController(
   group: TctrlGroup,
-  entriesInGroup: Array<{ id: number; comment: string; priority: string; tokens: number }>,
+  entriesInGroup: Array<{ id: number; comment: string; priority: string; tokens: number; controlHint?: AnalyzedEntry['controlHint'] }>,
+  variables: TctrlVariable[],
 ): string {
   const lines = [
     '@@preprocessing',
@@ -120,11 +147,28 @@ function generateFallbackGroupController(
   if (group.strategy === 'constant') {
     lines.push('// Constant group — tất cả entries luôn bật, không cần kiểm soát.');
   } else {
-    // Disable low priority entries
-    const lowPriority = entriesInGroup.filter(e => e.priority === 'low');
-    if (lowPriority.length > 0) {
-      lines.push(`// Tắt ${lowPriority.length} entries priority LOW để tiết kiệm token:`);
-      for (const entry of lowPriority) {
+    // Variable-controlled entries
+    const variableControlled = entriesInGroup.filter(e => e.controlHint);
+    const staticDisabled = entriesInGroup.filter(e => !e.controlHint && e.priority === 'low');
+
+    if (variableControlled.length > 0) {
+      lines.push(`// --- Điều khiển bằng biến (${variableControlled.length} entries) ---`);
+      for (const entry of variableControlled) {
+        if (!entry.comment || !entry.controlHint) continue;
+        const v = variables.find(v => v.name === entry.controlHint!.variableName);
+        const safeName = '_' + entry.controlHint.variableName.replace(/[^a-zA-Z0-9_]/g, '_');
+        if (v) {
+          lines.push(`setEntryEnabled('${entry.comment.replace(/'/g, "\\'")}', ${safeName} ${entry.controlHint.condition}); // ~${entry.tokens} tokens`);
+        } else {
+          // Variable not found, use condition directly
+          lines.push(`setEntryEnabled('${entry.comment.replace(/'/g, "\\'")}', ${safeName} ${entry.controlHint.condition}); // ~${entry.tokens} tokens`);
+        }
+      }
+    }
+
+    if (staticDisabled.length > 0) {
+      lines.push(``, `// --- Tắt tĩnh ${staticDisabled.length} entries priority LOW ---`);
+      for (const entry of staticDisabled) {
         if (entry.comment) {
           lines.push(`setEntryEnabled('${entry.comment.replace(/'/g, "\\'")}', false); // ~${entry.tokens} tokens`);
         }
@@ -235,9 +279,15 @@ Thông tin card:
 - Tổng: ${analysis.totalEntries} entries, ~${analysis.totalTokens.toLocaleString()} tokens
 - Budget: ${analysis.effectiveBudget.toLocaleString()} tokens
 - Groups: ${analysis.groups.map(g => `${g.name} (${g.entries.length} entries, ~${g.totalTokens.toLocaleString()} tokens, ${g.strategy})`).join('; ')}
+${analysis.variables.length > 0 ? `
+BIẾN ĐIỀU KHIỂN đã phát hiện:
+${analysis.variables.map(v => `- ${v.name} (${v.source}): getvar('${v.getvarPath}') default='${v.defaultValue}' → ${v.affectedEntries.length} entries`).join('\n')}
+
+Sinh var declarations dùng getvar() cho mỗi biến. VD:
+if (typeof _location === 'undefined') var _location = getvar('${analysis.variables[0]?.getvarPath ?? 'stat_data.@@tctrl.x'}', { defaults: '' });` : ''}
 
 Comment entry: @@TCTRL::GateKeeper_Main
-Mục đích: Overview controller, chứa thống kê, KHÔNG disable entries (các group controllers sẽ làm việc đó).`,
+Mục đích: Overview controller + khai báo biến. KHÔNG disable entries (các group controllers sẽ làm việc đó).`,
     () => generateFallbackGateKeeper(analysis),
   );
   apiCalls++;
@@ -261,14 +311,20 @@ Mục đích: Overview controller, chứa thống kê, KHÔNG disable entries (c
     while (ctx.paused) await sleep(300);
 
     const entriesInGroup = group.entries.map(id => {
-      const analyzed = analyzedEntries.find(e => e.entryId === id);
+      const ae = analyzedEntries.find(e => e.entryId === id);
       return {
         id,
-        comment: analyzed?.comment ?? `Entry #${id}`,
-        priority: analyzed?.priority ?? 'medium',
-        tokens: analyzed?.tokenEstimate ?? 0,
+        comment: ae?.comment ?? `Entry #${id}`,
+        priority: ae?.priority ?? 'medium',
+        tokens: ae?.tokenEstimate ?? 0,
+        controlHint: ae?.controlHint,
       };
     });
+
+    // Find variables relevant to this group
+    const groupVars = analysis.variables.filter(v =>
+      v.affectedEntries.some(eid => group.entries.includes(eid))
+    );
 
     ctx.log(`📡 Sinh @@TCTRL::Group_${group.id}...`);
 
@@ -286,10 +342,16 @@ ${entriesInGroup.length > 30 ? `\n... và ${entriesInGroup.length - 30} entries 
 
 Comment entry: @@TCTRL::Group_${group.id}
 Mục đích: Kiểm soát bật/tắt entries trong nhóm "${group.name}".
-- Entries priority LOW → disable bằng setEntryEnabled(comment, false)
-- Entries priority MEDIUM → giữ nguyên (để SillyTavern keyword matching quản lý)
+${groupVars.length > 0 ? `
+BIẾN CÓ SẴN (đã khai báo ở GateKeeper):
+${groupVars.map(v => `- _${v.name} ← getvar('${v.getvarPath}')`).join('\n')}
+
+Dùng biến để điều khiển: setEntryEnabled(comment, _location === 'X')
+` : ''}- Entries có biến → dùng biến điều khiển
+- Entries priority LOW không có biến → disable bằng setEntryEnabled(comment, false)
+- Entries priority MEDIUM → giữ nguyên
 - Entries priority HIGH/CRITICAL → không tắt`,
-      () => generateFallbackGroupController(group, entriesInGroup),
+      () => generateFallbackGroupController(group, entriesInGroup, analysis.variables),
     );
     apiCalls++;
     tctrlGenerated++;
@@ -341,6 +403,39 @@ Dùng setEntryEnabled(comment, false) cho từng entry cần tắt.`,
       order: 990,
     });
     ctx.log('✅ @@TCTRL::PriorityGate');
+  }
+
+  // 4. Schema init entry (only for auto-detected variables, not MVUZOD)
+  const autoVars = analysis.variables.filter(v => v.source === 'auto');
+  if (autoVars.length > 0 && !ctx.stopped) {
+    ctx.log('📡 Sinh @@TCTRL::Schema (init biến auto-detect)...');
+    const schemaInitLines = [
+      '@@preprocessing',
+      '<%# @@TCTRL::Schema — Auto Variable Init — DO NOT READ %>',
+      '<%_',
+      '// ═══ @@TCTRL SCHEMA — Biến điều khiển entries (auto-detect) ═══',
+      '// AI: Cập nhật các biến này mỗi lượt dựa trên context chat',
+      `if (typeof getvar('stat_data.@@tctrl') === 'undefined') {`,
+      `  setvar('stat_data.@@tctrl', {`,
+    ];
+    for (const v of autoVars) {
+      const val = v.type === 'number' ? v.defaultValue
+               : v.type === 'boolean' ? v.defaultValue
+               : `'${v.defaultValue}'`;
+      schemaInitLines.push(`    ${v.name}: ${val},`);
+    }
+    schemaInitLines.push('  });', '}', '_%>');
+
+    tctrlEntries.push({
+      comment: '@@TCTRL::Schema',
+      content: schemaInitLines.join('\n'),
+      keys: ['@@tctrl'],
+      constant: true,
+      position: 4,
+      depth: 0,
+      order: 1000, // Before GateKeeper
+    });
+    ctx.log(`✅ @@TCTRL::Schema (${autoVars.length} biến auto)`);
   }
 
   // Build summary

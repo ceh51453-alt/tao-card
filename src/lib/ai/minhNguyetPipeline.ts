@@ -278,6 +278,7 @@ function applyMnOutputToCard(
         defaultDepth: 4,
       }, nextEntryId(entries));
       cardStore.addEntry(entry);
+      entries.push(entry);
       break;
     }
 
@@ -294,6 +295,7 @@ function applyMnOutputToCard(
         defaultDepth: 4,
       }, nextEntryId(entries));
       cardStore.addEntry(entry);
+      entries.push(entry);
       break;
     }
 
@@ -310,6 +312,7 @@ function applyMnOutputToCard(
         defaultDepth: 4,
       }, nextEntryId(entries));
       cardStore.addEntry(entry);
+      entries.push(entry);
       break;
     }
 
@@ -325,6 +328,7 @@ function applyMnOutputToCard(
         defaultDepth: 4,
       }, nextEntryId(entries));
       cardStore.addEntry(entry);
+      entries.push(entry);
       break;
     }
 
@@ -342,6 +346,7 @@ function applyMnOutputToCard(
         defaultRole: 0,          // System
       }, nextEntryId(entries));
       cardStore.addEntry(entry);
+      entries.push(entry);
       break;
     }
 
@@ -357,6 +362,7 @@ function applyMnOutputToCard(
         defaultDepth: 4,
       }, nextEntryId(entries));
       cardStore.addEntry(entry);
+      entries.push(entry);
       break;
     }
 
@@ -372,6 +378,7 @@ function applyMnOutputToCard(
         defaultDepth: 4,
       }, nextEntryId(entries));
       cardStore.addEntry(entry);
+      entries.push(entry);
       break;
     }
 
@@ -390,6 +397,7 @@ function applyMnOutputToCard(
           defaultDepth: 4,
         }, nextEntryId(entries));
         cardStore.addEntry(entry);
+        entries.push(entry);
       }
       break;
     }
@@ -406,6 +414,7 @@ function applyMnOutputToCard(
         defaultDepth: 4,
       }, nextEntryId(entries));
       cardStore.addEntry(entry);
+      entries.push(entry);
       break;
     }
 

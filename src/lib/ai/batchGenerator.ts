@@ -37,6 +37,7 @@ export interface BatchGenConfig {
   cardType?: CardType;         // thẻ đơn vs nhiều nhân vật
   useWebSearch?: boolean;      // Kích hoạt SOTA Web Search
   autoConfig?: boolean;        // true = AI tự quyết order/position/depth per entry
+  schemaContext?: string;      // MVUZOD schema context — inject vào prompt khi có schema
 }
 
 export interface BatchProgress {
@@ -225,6 +226,11 @@ Personality: ${card.data.personality.slice(0, 500)}
 Scenario: ${card.data.scenario.slice(0, 500)}`);
   }
 
+  // Inject schema context khi có MVUZOD schema
+  if (config.schemaContext) {
+    parts.push(`### Schema biến (MVUZOD)\n${config.schemaContext}`);
+  }
+
   parts.push(`### Yêu cầu nội dung
 ${config.topicPrompt}`);
 
@@ -315,6 +321,13 @@ function sleep(ms: number) {
 }
 
 export async function runBatchGeneration(config: BatchGenConfig, ctx: BatchRunContext) {
+  if (!ctx.card.data.character_book) {
+    ctx.card.data.character_book = { name: ctx.card.data.name, entries: [] };
+  }
+  if (!ctx.card.data.character_book.entries) {
+    ctx.card.data.character_book.entries = [];
+  }
+  
   const totalBatches = Math.ceil(config.totalEntries / config.entriesPerBatch);
   const concurrency = Math.max(1, Math.min(config.concurrentBatches ?? 1, 10));
   let created = 0;
@@ -369,8 +382,11 @@ export async function runBatchGeneration(config: BatchGenConfig, ctx: BatchRunCo
       }
 
       const userMessage = buildBatchUserMessage(config, ctx.card, seen, ragCtx.injectionText, coherenceCtx, webInjection, countThisBatch, i, totalBatches);
+      const schemaAddon = config.schemaContext
+        ? '\n\n--- SCHEMA-AWARE MODE ---\nCard này có hệ biến MVU-ZOD. Khi viết content, hãy THAM CHIẾU đến các biến liên quan (nếu phù hợp ngữ cảnh entry). Ví dụ: mô tả NPC thì đề cập ảnh hưởng đến biến quan hệ, mô tả vật phẩm thì đề cập biến inventory. KHÔNG viết code EJS trong content.'
+        : '';
       const messages: ChatMessage[] = [
-        { role: 'system', content: BATCH_SYSTEM_PROMPT + (config.autoConfig ? AUTO_CONFIG_ADDON : '\n\nCHỈ trả về MỘT MẢNG JSON hợp lệ:\n[{"comment":"...","keys":["..."],"content":"..."},...  ]') + getProfileExtractionContext(profile) },
+        { role: 'system', content: BATCH_SYSTEM_PROMPT + (config.autoConfig ? AUTO_CONFIG_ADDON : '\n\nCHỈ trả về MỘT MẢNG JSON hợp lệ:\n[{"comment":"...","keys":["..."],"content":"..."},...  ]') + schemaAddon + getProfileExtractionContext(profile) },
         { role: 'user', content: userMessage },
       ];
 
@@ -448,6 +464,7 @@ export async function runBatchGeneration(config: BatchGenConfig, ctx: BatchRunCo
         );
 
         ctx.appendEntry(entry);
+        ctx.card.data.character_book!.entries.push(entry);
         seen.push({ comment: entry.comment, keys: entry.keys });
         created++;
         batchCreated++;
