@@ -9,6 +9,10 @@ import type {
   ColorPreset,
   CharacterImage,
   TabItem,
+  ToolbarButton,
+  PageItem,
+  CurrencyItem,
+  CssVariable,
 } from '../../types/gameUiConfig.types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -167,6 +171,24 @@ export const DEFAULT_RARITY_COLORS = {
 // DEFAULT CONFIG
 // ═══════════════════════════════════════════════════════════════════════════
 
+export const DEFAULT_TOOLBAR_BUTTONS: ToolbarButton[] = [
+  { id: uuidv4(), emoji: '⬆️', label: 'Lên đầu', action: 'scroll-top', enabled: true },
+  { id: uuidv4(), emoji: '⛶', label: 'Fullscreen', action: 'fullscreen', enabled: true },
+  { id: uuidv4(), emoji: '🌓', label: 'Theme', action: 'theme-toggle', enabled: true },
+  { id: uuidv4(), emoji: '🔤', label: 'Font', action: 'font-size', enabled: false },
+];
+
+export const DEFAULT_PAGES: PageItem[] = [
+  { id: uuidv4(), label: 'Trang chính', emoji: '🏠', enabled: true },
+  { id: uuidv4(), label: 'Trạng thái', emoji: '📊', enabled: true },
+  { id: uuidv4(), label: 'Kỹ năng', emoji: '⚔️', enabled: true },
+];
+
+export const DEFAULT_CURRENCIES: CurrencyItem[] = [
+  { id: uuidv4(), name: 'Vàng', emoji: '🪙', color: '#eab308' },
+  { id: uuidv4(), name: 'Bạc', emoji: '🥈', color: '#a1a1a1' },
+];
+
 export const DEFAULT_GAME_UI_CONFIG: GameUIConfig = {
   enabledSections: {
     typography: true,
@@ -183,6 +205,19 @@ export const DEFAULT_GAME_UI_CONFIG: GameUIConfig = {
     notifications: false,
     transitions: false,
     responsive: false,
+    theme: false,
+    retroEffects: false,
+    audioPlayer: false,
+    toolbar: false,
+    readingMode: false,
+    multiPage: false,
+    collapsibles: false,
+    currency: false,
+    badges: false,
+    cssAdvanced: false,
+    eventPopup: false,
+    dataTable: false,
+    formElements: false,
   },
   typography: {
     fontFamily: 'Noto Sans TC',
@@ -327,7 +362,185 @@ export const DEFAULT_GAME_UI_CONFIG: GameUIConfig = {
     touchFriendly: true,
     swipeGestures: false,
   },
+
+  // ── New sections ──
+
+  theme: {
+    enableDualTheme: false,
+    defaultTheme: 'dark',
+    autoDetect: false,
+    lightBg: '#f5f5f5',
+    lightText: '#1a1a1a',
+    lightAccent: '#3b82f6',
+    lightSurface: '#ffffff',
+    enableEyeCare: false,
+    eyeCareStrength: 20,
+  },
+  retroEffects: {
+    enableScanlines: false,
+    scanlineOpacity: 0.03,
+    scanlineGap: 4,
+    enableCrtVignette: false,
+    crtIntensity: 40,
+    enableNoiseTexture: false,
+    noiseOpacity: 0.015,
+    enableTerminalStyle: false,
+    customOverlayUrl: '',
+    overlayBlendMode: 'normal',
+  },
+  audioPlayer: {
+    enabled: false,
+    playerStyle: 'mini',
+    position: 'bottom',
+    defaultTrackUrl: '',
+    trackLabel: 'BGM',
+    autoPlay: false,
+    showVolume: true,
+    showSeek: true,
+    loop: true,
+    playerBg: '#111116',
+    playerAccent: '#818cf8',
+  },
+  toolbar: {
+    enabled: false,
+    position: 'bottom-fixed',
+    style: 'pill',
+    buttons: DEFAULT_TOOLBAR_BUTTONS,
+    showLabels: true,
+    compact: false,
+    bgColor: '#111116',
+    textColor: '#d4d4d8',
+  },
+  readingMode: {
+    enableFullscreen: false,
+    enableFontSizeControl: false,
+    fontSizeMin: 12,
+    fontSizeMax: 24,
+    enableLineWidthControl: false,
+    showScrollToTop: true,
+    showChapterNav: false,
+    readingBg: '#0a0a0a',
+  },
+  multiPage: {
+    enabled: false,
+    pages: DEFAULT_PAGES,
+    navStyle: 'dots',
+    pageTransition: 'fade',
+    showPageCounter: true,
+    allowDirectJump: true,
+    navPosition: 'bottom',
+  },
+  collapsibles: {
+    defaultState: 'closed',
+    iconStyle: 'chevron',
+    animation: 'slide',
+    enableNested: true,
+    borderStyle: 'solid',
+    headerStyle: 'bold',
+    borderRadius: 8,
+  },
+  currency: {
+    currencies: DEFAULT_CURRENCIES,
+    displayStyle: 'badge',
+    showIcon: true,
+    animateChange: true,
+    format: 'full',
+  },
+  badges: {
+    enabled: false,
+    shape: 'pill',
+    position: 'inline',
+    titleDisplay: 'below-name',
+    rarityGlow: true,
+    maxVisible: 5,
+    badgeBg: '#1e1e28',
+    badgeText: '#d4d4d8',
+  },
+  cssAdvanced: {
+    customVariables: [],
+    additionalFontUrls: [],
+    customCssSnippet: '',
+    boxSizingReset: true,
+    scrollbarStyle: 'thin',
+    scrollbarColor: '#3a3a4a',
+    selectionColor: '#ffffff',
+    selectionBg: '#818cf8',
+  },
+  eventPopup: {
+    enabled: false,
+    layout: 'centered',
+    showIcon: true,
+    iconPosition: 'top',
+    showSeverityBadge: true,
+    defaultSeverity: 'info',
+    showChoices: true,
+    choiceStyle: 'buttons',
+    animateEntry: true,
+    entryAnimation: 'slideDown',
+    popupBg: '#1e1e28',
+    popupBorder: '#3a3a4a',
+    popupAccent: '#818cf8',
+    borderRadius: 12,
+    showCloseButton: false,
+  },
+  dataTable: {
+    enabled: false,
+    tableStyle: 'striped',
+    density: 'normal',
+    showHeader: true,
+    stickyHeader: false,
+    hoverHighlight: true,
+    alternateRowColor: true,
+    headerBg: '#1a1a2e',
+    headerText: '#e2e8f0',
+    rowBg: '#111116',
+    rowAltBg: '#16161e',
+    borderColor: '#2a2a3a',
+    borderRadius: 8,
+    maxHeight: 0,
+    enableSorting: false,
+  },
+  formElements: {
+    enabled: false,
+    formStyle: 'modern',
+    inputBg: '#1a1a2e',
+    inputBorder: '#3a3a4a',
+    inputText: '#e2e8f0',
+    inputRadius: 6,
+    inputPadding: 10,
+    focusColor: '#818cf8',
+    labelStyle: 'above',
+    selectStyle: 'custom-dropdown',
+    sliderAccent: '#818cf8',
+    sliderTrackBg: '#2a2a3a',
+    buttonSubmitBg: '#818cf8',
+    buttonSubmitText: '#ffffff',
+    buttonCancelBg: '#3a3a4a',
+    buttonCancelText: '#d4d4d8',
+    fieldsetBorder: true,
+    fieldGap: 12,
+  },
 };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DEFAULT ITEMS FOR NEW SECTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+export function createToolbarButton(): ToolbarButton {
+  return { id: uuidv4(), emoji: '⭐', label: 'Nút mới', action: 'custom', enabled: true };
+}
+
+export function createPageItem(): PageItem {
+  return { id: uuidv4(), label: 'Trang mới', emoji: '📄', enabled: true };
+}
+
+export function createCurrencyItem(): CurrencyItem {
+  return { id: uuidv4(), name: 'Tiền mới', emoji: '💎', color: '#a855f7' };
+}
+
+export function createCssVariable(): CssVariable {
+  return { id: uuidv4(), name: '--custom-color', value: '#818cf8' };
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // HELPERS

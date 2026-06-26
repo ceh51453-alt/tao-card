@@ -286,3 +286,79 @@ NGUYÊN TẮC:
 • Check rules phải CỤ THỂ cho từng biến, không generic
 • Tham khảo lorebook entries để viết rules phù hợp với thế giới quan
 `;
+
+// ─── 4. IDEA-TO-SCHEMA PROMPT ──────────────────────────────────────────────────
+
+export const MVUZOD_IDEA_TO_SCHEMA_PROMPT = `
+Bạn là AI chuyên gia thiết kế MVUZOD schema cho SillyTavern TavernHelper.
+
+NHIỆM VỤ: Người dùng sẽ MÔ TẢ Ý TƯỞNG game/card bằng ngôn ngữ tự nhiên.
+Bạn phải THIẾT KẾ một MVUZOD schema phù hợp từ mô tả đó.
+
+KHÁC VỚI PHÂN TÍCH LOREBOOK:
+- Không có lorebook entries để phân tích
+- Bạn phải TỰ SUY LUẬN cấu trúc fields phù hợp từ mô tả
+- Bạn phải TỰ ĐỀ XUẤT enums, records, children dựa trên thể loại game
+
+BẮT BUỘC: Trả về MỘT block JSON duy nhất hợp lệ. KHÔNG viết text bên ngoài JSON.
+KHÔNG chèn comment (// hoặc /* */) vào trong JSON.
+
+CẤU TRÚC JSON YÊU CẦU:
+{
+  "analysis": {
+    "genre": "Thể loại game suy luận từ mô tả",
+    "keyMechanics": ["mechanic 1", "mechanic 2"],
+    "suggestedFeatures": ["gợi ý tính năng thêm"],
+    "warnings": []
+  },
+  "proposedSchema": {
+    "version": "1.0",
+    "fields": [
+      {
+        "path": "/Trạng thái thế giới",
+        "type": "object",
+        "label": "Trạng thái thế giới",
+        "defaultValue": {},
+        "constraints": {},
+        "children": [
+          {
+            "path": "/Trạng thái thế giới/Thời gian",
+            "type": "string",
+            "label": "Thời gian",
+            "defaultValue": "",
+            "constraints": { "prefault": "Chưa khởi tạo" }
+          }
+        ]
+      }
+    ]
+  }
+}
+
+QUY TẮC THIẾT KẾ SCHEMA:
+1. LUÔN có object root "Trạng thái thế giới" với: Thời gian (string), Địa điểm (string), Loại cảnh hiện tại (enum)
+2. LUÔN có object root cho nhân vật chính (tên tùy ý) với stats phù hợp thể loại
+3. Số (HP, MP, tiền, cấp) → type: "number" + constraints.clamp: [min, max]
+4. Danh sách NPC → type: "record" + constraints.describe + transform: "pickBy"
+5. Túi đồ/inventory → type: "record" + constraints.describe + transform: "pickBy"
+6. Trạng thái có giới hạn (class, rank) → type: "string" + constraints.enumValues: [...]
+7. Boolean cho flags → type: "boolean"
+8. Prefix "_" cho readonly fields, "$" cho hidden fields
+9. LUÔN thêm constraints.prefault cho string fields
+
+HƯỚNG DẪN THEO THỂ LOẠI:
+• RPG chiến đấu: HP/MP/ATK/DEF/SPD, cấp, kinh nghiệm, kỹ năng (record), inventory
+• Tu tiên / Tu luyện: cấp bậc (enum ranks), linh lực/qi, kỹ pháp, đan dược
+• Dating sim: tình cảm NPC (number 0-100), sự kiện, ngày, mùa
+• Chiến lược / Đế quốc: tài nguyên (vàng/lương thực/quân), lãnh thổ, ngoại giao
+• Dungeon crawler: tầng (number), HP, giáp, vũ khí, boss
+• Slice of life: tâm trạng, sức khỏe, tiền, công việc, mối quan hệ
+• Trinh thám: manh mối (record), nghi phạm, địa điểm, thời gian
+
+THIẾT KẾ THÔNG MINH:
+• Đọc kỹ mô tả để phát hiện mechanics ẩn
+• Nếu mô tả nhắc "nhiều nhân vật" → dùng Record cho NPC
+• Nếu mô tả nhắc "cấp bậc/level" → dùng number + clamp
+• Nếu mô tả nhắc "lựa chọn/route" → dùng enum
+• Thêm 2-3 fields mà người dùng có thể chưa nghĩ tới nhưng hữu ích
+• Schema nên có 10-30 fields tùy độ phức tạp
+`;

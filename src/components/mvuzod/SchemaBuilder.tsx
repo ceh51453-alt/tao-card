@@ -18,6 +18,7 @@ import {
   Lock, FolderPlus,
   Code, Layers, Scan, RotateCcw,
   Zap, ListOrdered, LayoutList, Square,
+  Lightbulb, Brain,
 } from 'lucide-react';
 import { useCardStore } from '../../store/cardStore';
 import type { MVUZODSchema, MVUZODField, MVUZODConstraints } from '../../types/mvuzod.types';
@@ -27,7 +28,7 @@ import { analyzeLorebookForSchema, buildMinimalSchemaFromReport, parseSchemaInfe
 import { buildMVUZODScripts } from '../../lib/mvuzod/tavernScriptBuilder';
 import { useSettingsStore } from '../../store/settingsStore';
 import { callAI } from '../../lib/ai/client';
-import { MVUZOD_SCHEMA_INFERENCE_PROMPT } from '../../prompts/modeMVUZOD';
+import { MVUZOD_SCHEMA_INFERENCE_PROMPT, MVUZOD_IDEA_TO_SCHEMA_PROMPT } from '../../prompts/modeMVUZOD';
 import type { ChatMessage } from '../../types';
 import { cn } from '../../lib/utils';
 
@@ -556,7 +557,7 @@ CHỈ trả về JSON, KHÔNG giải thích.`;
       setScanProgress(null);
       cancelRef.current = false;
     }
-  }, [entries, entryCount, onApplyInferred, scanMode, batchSize, parallelCount, callAIForEntries, mergeSchemas]);
+  }, [entries, onApplyInferred, scanMode, batchSize, parallelCount, callAIForEntries, mergeSchemas]);
 
   const handleStaticAnalyze = useCallback(async () => {
     const report = analyzeLorebookForSchema(entries as LorebookEntry[]);
@@ -567,6 +568,89 @@ CHỈ trả về JSON, KHÔNG giải thích.`;
   const handleCancel = useCallback(() => {
     cancelRef.current = true;
   }, []);
+
+  // ─── Idea-to-schema state & handler ───
+  const [ideaText, setIdeaText] = useState('');
+  const [ideaLoading, setIdeaLoading] = useState(false);
+  const [ideaStatus, setIdeaStatus] = useState('');
+
+  const IDEA_CHIPS = [
+    { label: '⚔️ RPG chiến đấu', text: 'Game RPG chiến đấu với hệ thống HP, MP, cấp độ, kỹ năng, túi đồ, và NPC đồng hành' },
+    { label: '🏔️ Tu tiên / Tu luyện', text: 'Card tu tiên tu luyện với cảnh giới, linh lực, kỹ pháp, đan dược, và hệ thống tông môn' },
+    { label: '💕 Hẹn hò / Dating sim', text: 'Dating sim với nhiều NPC có cảm xúc, sự kiện hẹn hò, quà tặng, và nhiều route' },
+    { label: '🏰 Chiến lược / Đế quốc', text: 'Game chiến lược đế quốc với tài nguyên (vàng/lương/quân), lãnh thổ, ngoại giao, và hội đồng' },
+    { label: '🗡️ Dungeon Crawler', text: 'Dungeon crawler với HP, giáp, vũ khí, tầng, boss, bẫy, và kho báu' },
+    { label: '🌸 Đời thường', text: 'Slice of life với tâm trạng, sức khỏe, tiền, công việc, mối quan hệ, và thời tiết' },
+    { label: '🔍 Trinh thám', text: 'Trinh thám mystery với manh mối, nghi phạm, địa điểm điều tra, và timeline' },
+    { label: '💰 Kinh tế', text: 'Kinh tế thương mại với vàng, hàng hóa, danh tiếng, hợp đồng, và thị trường' },
+  ];
+
+  const handleIdeaGenerate = useCallback(async () => {
+    if (!ideaText.trim()) return;
+
+    setIdeaLoading(true);
+    setError(null);
+    setIdeaStatus('Đang kết nối AI...');
+
+    try {
+      const activeProfile = useSettingsStore.getState().getActiveProfile();
+      const params = useSettingsStore.getState().generationParams;
+
+      if (!activeProfile || !activeProfile.apiKey) {
+        throw new Error('Chưa cấu hình API AI. Vào Settings → API Key.');
+      }
+
+      setIdeaStatus(`Đang gửi ý tưởng tới ${activeProfile.label}...`);
+
+      const messages: ChatMessage[] = [
+        { role: 'system', content: MVUZOD_IDEA_TO_SCHEMA_PROMPT },
+        { role: 'user', content: `Ý TƯỞNG CỦA TÔI:\n\n${ideaText.trim()}\n\nHãy thiết kế MVUZOD schema phù hợp. Trả về JSON.` },
+      ];
+
+      let fullText = '';
+      let isTruncated = true;
+      let callCount = 0;
+      let currentMessages = messages;
+
+      while (isTruncated && callCount < 4) {
+        callCount++;
+        if (callCount > 1) setIdeaStatus(`Tiếp tục phản hồi (lượt ${callCount})...`);
+
+        const response = await callAI({
+          profile: activeProfile,
+          params: { ...params, useJsonResponseFormat: true },
+          messages: currentMessages,
+        });
+
+        fullText += response.text;
+        isTruncated = ['MAX_TOKENS', 'max_tokens', 'length'].includes(response.finishReason || '');
+
+        if (isTruncated && response.text.trim()) {
+          currentMessages = [
+            ...currentMessages,
+            { role: 'assistant', content: response.text },
+            { role: 'user', content: 'Viết tiếp phần còn thiếu.' },
+          ];
+        } else {
+          isTruncated = false;
+        }
+      }
+
+      setIdeaStatus('Phân tích phản hồi...');
+      const parsed = parseSchemaInferenceResponse(fullText);
+      if (!parsed.proposedSchema) throw new Error('AI không trả về schema hợp lệ.');
+
+      await onApplyInferred(parsed.proposedSchema);
+      setIdeaStatus('Tạo schema thành công!');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIdeaLoading(false);
+      setTimeout(() => setIdeaStatus(''), 2000);
+    }
+  }, [ideaText, onApplyInferred]);
+
+  const isAnyLoading = loading || ideaLoading;
 
   return (
     <div className="p-4 space-y-5">
@@ -716,6 +800,72 @@ CHỈ trả về JSON, KHÔNG giải thích.`;
                 hover:bg-muted/80 disabled:opacity-50 transition-colors">
               Phân tích tĩnh
             </button>
+          </div>
+        )}
+      </div>
+
+      {/* ─── Idea-to-schema ─── */}
+      <div className="space-y-3">
+        <h4 className="text-xs font-semibold flex items-center gap-1.5">
+          <Lightbulb className="w-3.5 h-3.5 text-amber-400" /> Tạo từ ý tưởng
+        </h4>
+        <p className="text-[10px] text-muted-foreground">
+          Mô tả ý tưởng game/card — AI sẽ thiết kế schema phù hợp, không cần lorebook.
+        </p>
+
+        {/* Quick genre chips */}
+        <div className="flex flex-wrap gap-1">
+          {IDEA_CHIPS.map((chip) => (
+            <button
+              key={chip.label}
+              onClick={() => setIdeaText(prev => prev ? `${prev}\n${chip.text}` : chip.text)}
+              disabled={isAnyLoading}
+              className="px-2 py-1 rounded-full text-[9px] border border-border bg-background/50
+                hover:bg-amber-500/10 hover:border-amber-500/30 transition-colors
+                disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {chip.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Idea textarea */}
+        <textarea
+          value={ideaText}
+          onChange={e => setIdeaText(e.target.value)}
+          disabled={isAnyLoading}
+          placeholder={`Mô tả chi tiết ý tưởng card của bạn. Ví dụ:
+
+• Game tu tiên có 9 cảnh giới, hệ thống linh lực, kỹ pháp, đan dược
+• Nhân vật chính có HP/MP, inventory, và NPC đồng hành
+• Có hệ thống tông môn với ranking và nhiệm vụ
+• Muốn track mối quan hệ với 5 NPC chính`}
+          className="w-full px-3 py-2.5 text-xs rounded-lg border border-border bg-background
+            placeholder:text-muted-foreground/40 resize-y
+            focus:outline-none focus:ring-2 focus:ring-amber-400/20 focus:border-amber-400/40 transition-all"
+          rows={5}
+        />
+
+        {/* Generate button & status */}
+        {ideaLoading ? (
+          <div className="rounded-lg p-4 border border-amber-500/20 bg-amber-500/5 flex flex-col items-center gap-3">
+            <div className="w-6 h-6 rounded-full border-2 border-amber-400 border-t-transparent animate-spin" />
+            <p className="text-[10px] text-muted-foreground animate-pulse text-center">{ideaStatus}</p>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleIdeaGenerate}
+              disabled={!ideaText.trim() || isAnyLoading}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500
+                text-white text-xs font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all
+                shadow-sm shadow-amber-500/20"
+            >
+              <Brain className="w-3.5 h-3.5" /> AI Thiết kế Schema
+            </button>
+            {ideaStatus && (
+              <span className="text-[10px] text-emerald-400">{ideaStatus}</span>
+            )}
           </div>
         )}
       </div>

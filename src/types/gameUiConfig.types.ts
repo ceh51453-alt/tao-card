@@ -10,7 +10,10 @@
 export type ConfigSection =
   | 'typography' | 'images' | 'layout' | 'effects' | 'colorScheme' | 'textStyling'
   | 'tabs' | 'progressBars' | 'buttons' | 'npcCards' | 'inventory'
-  | 'notifications' | 'transitions' | 'responsive';
+  | 'notifications' | 'transitions' | 'responsive'
+  | 'theme' | 'retroEffects' | 'audioPlayer' | 'toolbar' | 'readingMode'
+  | 'multiPage' | 'collapsibles' | 'currency' | 'badges' | 'cssAdvanced'
+  | 'eventPopup' | 'dataTable' | 'formElements';
 
 export interface GameUIConfig {
   enabledSections: Record<ConfigSection, boolean>;
@@ -28,6 +31,19 @@ export interface GameUIConfig {
   notifications: NotificationConfig;
   transitions: TransitionConfig;
   responsive: ResponsiveConfig;
+  theme: ThemeConfig;
+  retroEffects: RetroEffectsConfig;
+  audioPlayer: AudioPlayerConfig;
+  toolbar: ToolbarConfig;
+  readingMode: ReadingModeConfig;
+  multiPage: MultiPageConfig;
+  collapsibles: CollapsibleConfig;
+  currency: CurrencyConfig;
+  badges: BadgesConfig;
+  cssAdvanced: CssAdvancedConfig;
+  eventPopup: EventPopupConfig;
+  dataTable: DataTableConfig;
+  formElements: FormElementsConfig;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -299,4 +315,274 @@ export interface ResponsiveConfig {
   stackColumnsOnMobile: boolean;
   touchFriendly: boolean;       // larger tap targets
   swipeGestures: boolean;       // swipe tabs, inventory
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// THEME / DARK-LIGHT MODE
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface ThemeConfig {
+  enableDualTheme: boolean;
+  defaultTheme: 'dark' | 'light';
+  autoDetect: boolean;             // theo system preference
+  lightBg: string;
+  lightText: string;
+  lightAccent: string;
+  lightSurface: string;
+  enableEyeCare: boolean;
+  eyeCareStrength: number;         // 0-100 (sepia %)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RETRO / SPECIAL EFFECTS
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface RetroEffectsConfig {
+  enableScanlines: boolean;
+  scanlineOpacity: number;         // 0-0.15
+  scanlineGap: number;             // px (2-8)
+  enableCrtVignette: boolean;
+  crtIntensity: number;            // 0-100
+  enableNoiseTexture: boolean;
+  noiseOpacity: number;            // 0-0.1
+  enableTerminalStyle: boolean;    // monospace + green-on-black
+  customOverlayUrl: string;
+  overlayBlendMode: 'normal' | 'multiply' | 'screen' | 'overlay';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AUDIO / MUSIC PLAYER
+// ═══════════════════════════════════════════════════════════════════════════
+
+export type PlayerStyle = 'mini' | 'full' | 'floating';
+export type PlayerPosition = 'bottom' | 'top' | 'floating-br' | 'floating-bl';
+
+export interface AudioPlayerConfig {
+  enabled: boolean;
+  playerStyle: PlayerStyle;
+  position: PlayerPosition;
+  defaultTrackUrl: string;
+  trackLabel: string;
+  autoPlay: boolean;
+  showVolume: boolean;
+  showSeek: boolean;
+  loop: boolean;
+  playerBg: string;
+  playerAccent: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TOOLBAR / ACTION BAR
+// ═══════════════════════════════════════════════════════════════════════════
+
+export type ToolbarPosition = 'bottom-fixed' | 'top-fixed' | 'floating-br' | 'floating-bl';
+export type ToolbarStyle = 'pill' | 'flat' | 'glass' | 'minimal';
+
+export interface ToolbarButton {
+  id: string;
+  emoji: string;
+  label: string;
+  action: 'scroll-top' | 'fullscreen' | 'theme-toggle' | 'font-size' | 'custom';
+  enabled: boolean;
+}
+
+export interface ToolbarConfig {
+  enabled: boolean;
+  position: ToolbarPosition;
+  style: ToolbarStyle;
+  buttons: ToolbarButton[];
+  showLabels: boolean;
+  compact: boolean;                // chỉ icon
+  bgColor: string;
+  textColor: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// READING / FULLSCREEN MODE
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface ReadingModeConfig {
+  enableFullscreen: boolean;
+  enableFontSizeControl: boolean;  // user tự chỉnh
+  fontSizeMin: number;             // px (10-16)
+  fontSizeMax: number;             // px (18-32)
+  enableLineWidthControl: boolean;
+  showScrollToTop: boolean;
+  showChapterNav: boolean;
+  readingBg: string;               // bg riêng cho reading mode
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MULTI-PAGE / WIZARD
+// ═══════════════════════════════════════════════════════════════════════════
+
+export type PageNavStyle = 'dots' | 'arrows' | 'sidebar' | 'tabs';
+
+export interface PageItem {
+  id: string;
+  label: string;
+  emoji: string;
+  enabled: boolean;
+}
+
+export interface MultiPageConfig {
+  enabled: boolean;
+  pages: PageItem[];
+  navStyle: PageNavStyle;
+  pageTransition: SceneTransition;
+  showPageCounter: boolean;        // 1/5
+  allowDirectJump: boolean;
+  navPosition: 'top' | 'bottom' | 'both';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COLLAPSIBLE SECTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+export type CollapseIcon = 'arrow' | 'plus-minus' | 'chevron' | 'none';
+export type CollapseAnimation = 'slide' | 'fade' | 'none';
+
+export interface CollapsibleConfig {
+  defaultState: 'open' | 'closed';
+  iconStyle: CollapseIcon;
+  animation: CollapseAnimation;
+  enableNested: boolean;
+  borderStyle: 'solid' | 'dashed' | 'none' | 'accent';
+  headerStyle: 'bold' | 'accent-bg' | 'underline' | 'plain';
+  borderRadius: number;            // px (0-16)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CURRENCY / ECONOMY
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface CurrencyItem {
+  id: string;
+  name: string;
+  emoji: string;
+  color: string;
+}
+
+export interface CurrencyConfig {
+  currencies: CurrencyItem[];
+  displayStyle: 'inline' | 'badge' | 'row';
+  showIcon: boolean;
+  animateChange: boolean;
+  format: 'full' | 'abbreviated';  // 1500 vs 1.5K
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BADGES / ACHIEVEMENTS / TITLES
+// ═══════════════════════════════════════════════════════════════════════════
+
+export type BadgeShape = 'pill' | 'circle' | 'square' | 'ribbon';
+export type BadgePosition = 'inline' | 'floating' | 'header';
+
+export interface BadgesConfig {
+  enabled: boolean;
+  shape: BadgeShape;
+  position: BadgePosition;
+  titleDisplay: 'above-name' | 'below-name' | 'badge';
+  rarityGlow: boolean;
+  maxVisible: number;              // 1-10
+  badgeBg: string;
+  badgeText: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CSS VARIABLES / ADVANCED
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface CssVariable {
+  id: string;
+  name: string;                    // e.g. --accent-color
+  value: string;
+}
+
+export interface CssAdvancedConfig {
+  customVariables: CssVariable[];
+  additionalFontUrls: string[];    // Google Fonts URLs
+  customCssSnippet: string;        // raw CSS
+  boxSizingReset: boolean;
+  scrollbarStyle: 'default' | 'thin' | 'hidden' | 'custom';
+  scrollbarColor: string;
+  selectionColor: string;
+  selectionBg: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EVENT POPUP
+// ═══════════════════════════════════════════════════════════════════════════
+
+export type PopupSeverity = 'info' | 'warning' | 'danger' | 'success' | 'royal';
+export type PopupLayout = 'centered' | 'side-icon' | 'full-width' | 'compact';
+
+export interface EventPopupConfig {
+  enabled: boolean;
+  layout: PopupLayout;
+  showIcon: boolean;
+  iconPosition: 'top' | 'left';
+  showSeverityBadge: boolean;
+  defaultSeverity: PopupSeverity;
+  showChoices: boolean;            // render lựa chọn bên trong popup
+  choiceStyle: 'buttons' | 'cards' | 'list';
+  animateEntry: boolean;
+  entryAnimation: 'slideDown' | 'fadeIn' | 'scaleUp' | 'none';
+  popupBg: string;
+  popupBorder: string;
+  popupAccent: string;
+  borderRadius: number;            // px (0-20)
+  showCloseButton: boolean;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DATA TABLE / GRID
+// ═══════════════════════════════════════════════════════════════════════════
+
+export type TableStyle = 'striped' | 'bordered' | 'minimal' | 'card';
+export type TableDensity = 'compact' | 'normal' | 'spacious';
+
+export interface DataTableConfig {
+  enabled: boolean;
+  tableStyle: TableStyle;
+  density: TableDensity;
+  showHeader: boolean;
+  stickyHeader: boolean;
+  hoverHighlight: boolean;
+  alternateRowColor: boolean;
+  headerBg: string;
+  headerText: string;
+  rowBg: string;
+  rowAltBg: string;
+  borderColor: string;
+  borderRadius: number;            // px (0-16)
+  maxHeight: number;               // px (0 = auto, 200-600)
+  enableSorting: boolean;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FORM ELEMENTS
+// ═══════════════════════════════════════════════════════════════════════════
+
+export type FormStyle = 'modern' | 'classic' | 'minimal' | 'parchment';
+
+export interface FormElementsConfig {
+  enabled: boolean;
+  formStyle: FormStyle;
+  inputBg: string;
+  inputBorder: string;
+  inputText: string;
+  inputRadius: number;             // px (0-16)
+  inputPadding: number;            // px (4-16)
+  focusColor: string;              // focus ring color
+  labelStyle: 'above' | 'inline' | 'floating' | 'hidden';
+  selectStyle: 'native' | 'custom-dropdown';
+  sliderAccent: string;
+  sliderTrackBg: string;
+  buttonSubmitBg: string;
+  buttonSubmitText: string;
+  buttonCancelBg: string;
+  buttonCancelText: string;
+  fieldsetBorder: boolean;
+  fieldGap: number;                // px (4-20)
 }

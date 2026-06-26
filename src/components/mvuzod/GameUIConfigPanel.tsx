@@ -11,6 +11,9 @@ import {
   Plus, Trash2, ExternalLink, ZoomIn, Eye,
   Columns3, BarChart3, MousePointerClick, Users, Package,
   Bell, Zap, Smartphone,
+  Moon, Monitor, Music, PanelBottom, BookOpen, FileStack,
+  ChevronUp, Coins, Award, Code2,
+  AlertCircle, Table2, TextCursorInput,
 } from 'lucide-react';
 import type {
   GameUIConfig,
@@ -30,6 +33,14 @@ import type {
   InventoryLayout, ItemRarity,
   ToastPosition, ToastStyle,
   SceneTransition,
+  PlayerStyle, PlayerPosition,
+  ToolbarPosition, ToolbarStyle,
+  PageNavStyle,
+  CollapseIcon, CollapseAnimation,
+  BadgeShape, BadgePosition,
+  PopupLayout, PopupSeverity,
+  TableStyle, TableDensity,
+  FormStyle,
 } from '../../types/gameUiConfig.types';
 import {
   POPULAR_FONTS,
@@ -39,6 +50,10 @@ import {
   applyColorPreset,
   IMAGE_SIZE_PX,
   createTabItem,
+  createToolbarButton,
+  createPageItem,
+  createCurrencyItem,
+  createCssVariable,
 } from '../../lib/mvuzod/gameUiDefaults';
 import { cn } from '../../lib/utils';
 
@@ -1266,6 +1281,606 @@ export function GameUIConfigPanel({ config, onChange, disabled }: GameUIConfigPa
             <ToggleRow label="Swipe gestures" value={config.responsive.swipeGestures}
               onChange={v => update('responsive', { ...config.responsive, swipeGestures: v })} disabled={disabled} />
           </>
+        )}
+      </Section>
+
+      {/* ─── THEME / DARK-LIGHT ─── */}
+      <Section icon={Moon} title="Theme / Dark-Light" summary={
+        config.theme.enableDualTheme ? `${config.theme.defaultTheme}, eye-care: ${config.theme.enableEyeCare ? 'có' : 'không'}` : 'single'
+      } enabled={s.theme} onToggleEnabled={() => toggleSection('theme')}>
+        <ToggleRow label="Dual theme (Dark + Light)" value={config.theme.enableDualTheme}
+          onChange={v => update('theme', { ...config.theme, enableDualTheme: v })} disabled={disabled} />
+        {config.theme.enableDualTheme && (
+          <>
+            <RadioRow<'dark' | 'light'>
+              label="Theme mặc định"
+              value={config.theme.defaultTheme}
+              options={[{ value: 'dark', label: 'Dark' }, { value: 'light', label: 'Light' }]}
+              onChange={v => update('theme', { ...config.theme, defaultTheme: v })} disabled={disabled} />
+            <ToggleRow label="Auto-detect (system)" value={config.theme.autoDetect}
+              onChange={v => update('theme', { ...config.theme, autoDetect: v })} disabled={disabled} />
+            <ColorRow label="Light bg" value={config.theme.lightBg}
+              onChange={v => update('theme', { ...config.theme, lightBg: v })} disabled={disabled} />
+            <ColorRow label="Light text" value={config.theme.lightText}
+              onChange={v => update('theme', { ...config.theme, lightText: v })} disabled={disabled} />
+            <ColorRow label="Light accent" value={config.theme.lightAccent}
+              onChange={v => update('theme', { ...config.theme, lightAccent: v })} disabled={disabled} />
+            <ColorRow label="Light surface" value={config.theme.lightSurface}
+              onChange={v => update('theme', { ...config.theme, lightSurface: v })} disabled={disabled} />
+          </>
+        )}
+        <ToggleRow label="Eye care mode" value={config.theme.enableEyeCare}
+          onChange={v => update('theme', { ...config.theme, enableEyeCare: v })} disabled={disabled} />
+        {config.theme.enableEyeCare && (
+          <SliderRow label="Sepia strength" value={config.theme.eyeCareStrength} min={5} max={50} step={5}
+            onChange={v => update('theme', { ...config.theme, eyeCareStrength: v })} disabled={disabled} />
+        )}
+      </Section>
+
+      {/* ─── RETRO EFFECTS ─── */}
+      <Section icon={Monitor} title="Retro / CRT Effects" summary={
+        [config.retroEffects.enableScanlines && 'scanline', config.retroEffects.enableCrtVignette && 'CRT', config.retroEffects.enableNoiseTexture && 'noise', config.retroEffects.enableTerminalStyle && 'terminal'].filter(Boolean).join(', ') || 'tắt'
+      } enabled={s.retroEffects} onToggleEnabled={() => toggleSection('retroEffects')}>
+        <ToggleRow label="Scanlines" value={config.retroEffects.enableScanlines}
+          onChange={v => update('retroEffects', { ...config.retroEffects, enableScanlines: v })} disabled={disabled} />
+        {config.retroEffects.enableScanlines && (
+          <>
+            <SliderRow label="Scanline opacity" value={config.retroEffects.scanlineOpacity} min={0.01} max={0.15} step={0.01}
+              onChange={v => update('retroEffects', { ...config.retroEffects, scanlineOpacity: v })} disabled={disabled} />
+            <SliderRow label="Scanline gap (px)" value={config.retroEffects.scanlineGap} min={2} max={8} step={1}
+              onChange={v => update('retroEffects', { ...config.retroEffects, scanlineGap: v })} disabled={disabled} />
+          </>
+        )}
+        <ToggleRow label="CRT vignette" value={config.retroEffects.enableCrtVignette}
+          onChange={v => update('retroEffects', { ...config.retroEffects, enableCrtVignette: v })} disabled={disabled} />
+        {config.retroEffects.enableCrtVignette && (
+          <SliderRow label="CRT intensity" value={config.retroEffects.crtIntensity} min={10} max={80} step={5}
+            onChange={v => update('retroEffects', { ...config.retroEffects, crtIntensity: v })} disabled={disabled} />
+        )}
+        <ToggleRow label="Noise texture" value={config.retroEffects.enableNoiseTexture}
+          onChange={v => update('retroEffects', { ...config.retroEffects, enableNoiseTexture: v })} disabled={disabled} />
+        {config.retroEffects.enableNoiseTexture && (
+          <SliderRow label="Noise opacity" value={config.retroEffects.noiseOpacity} min={0.005} max={0.1} step={0.005}
+            onChange={v => update('retroEffects', { ...config.retroEffects, noiseOpacity: v })} disabled={disabled} />
+        )}
+        <ToggleRow label="Terminal style (monospace)" value={config.retroEffects.enableTerminalStyle}
+          onChange={v => update('retroEffects', { ...config.retroEffects, enableTerminalStyle: v })} disabled={disabled} />
+        <div className="space-y-1">
+          <span className="text-[10px] text-muted-foreground">Custom overlay URL</span>
+          <input type="text" value={config.retroEffects.customOverlayUrl} placeholder="https://..."
+            onChange={e => update('retroEffects', { ...config.retroEffects, customOverlayUrl: e.target.value })}
+            disabled={disabled} className="w-full px-2 py-1 rounded text-[10px] bg-background border border-border" />
+        </div>
+        <RadioRow<'normal' | 'multiply' | 'screen' | 'overlay'>
+          label="Overlay blend"
+          value={config.retroEffects.overlayBlendMode}
+          options={[{ value: 'normal', label: 'Normal' }, { value: 'multiply', label: 'Multiply' }, { value: 'screen', label: 'Screen' }, { value: 'overlay', label: 'Overlay' }]}
+          onChange={v => update('retroEffects', { ...config.retroEffects, overlayBlendMode: v })} disabled={disabled} />
+      </Section>
+
+      {/* ─── AUDIO PLAYER ─── */}
+      <Section icon={Music} title="Audio / Music Player" summary={
+        config.audioPlayer.enabled ? `${config.audioPlayer.playerStyle}, ${config.audioPlayer.position}` : 'tắt'
+      } enabled={s.audioPlayer} onToggleEnabled={() => toggleSection('audioPlayer')}>
+        <ToggleRow label="Bật player" value={config.audioPlayer.enabled}
+          onChange={v => update('audioPlayer', { ...config.audioPlayer, enabled: v })} disabled={disabled} />
+        {config.audioPlayer.enabled && (
+          <>
+            <RadioRow<PlayerStyle>
+              label="Style"
+              value={config.audioPlayer.playerStyle}
+              options={[{ value: 'mini', label: 'Mini' }, { value: 'full', label: 'Full' }, { value: 'floating', label: 'Floating' }]}
+              onChange={v => update('audioPlayer', { ...config.audioPlayer, playerStyle: v })} disabled={disabled} />
+            <RadioRow<PlayerPosition>
+              label="Vị trí"
+              value={config.audioPlayer.position}
+              options={[{ value: 'bottom', label: 'Dưới' }, { value: 'top', label: 'Trên' }, { value: 'floating-br', label: 'Float ↘' }, { value: 'floating-bl', label: 'Float ↙' }]}
+              onChange={v => update('audioPlayer', { ...config.audioPlayer, position: v })} disabled={disabled} />
+            <div className="space-y-1">
+              <span className="text-[10px] text-muted-foreground">Track URL</span>
+              <input type="text" value={config.audioPlayer.defaultTrackUrl} placeholder="https://..."
+                onChange={e => update('audioPlayer', { ...config.audioPlayer, defaultTrackUrl: e.target.value })}
+                disabled={disabled} className="w-full px-2 py-1 rounded text-[10px] bg-background border border-border" />
+            </div>
+            <div className="space-y-1">
+              <span className="text-[10px] text-muted-foreground">Track label</span>
+              <input type="text" value={config.audioPlayer.trackLabel}
+                onChange={e => update('audioPlayer', { ...config.audioPlayer, trackLabel: e.target.value })}
+                disabled={disabled} className="w-full px-2 py-1 rounded text-[10px] bg-background border border-border" />
+            </div>
+            <ToggleRow label="Auto-play" value={config.audioPlayer.autoPlay}
+              onChange={v => update('audioPlayer', { ...config.audioPlayer, autoPlay: v })} disabled={disabled} />
+            <ToggleRow label="Hiện volume" value={config.audioPlayer.showVolume}
+              onChange={v => update('audioPlayer', { ...config.audioPlayer, showVolume: v })} disabled={disabled} />
+            <ToggleRow label="Hiện seek bar" value={config.audioPlayer.showSeek}
+              onChange={v => update('audioPlayer', { ...config.audioPlayer, showSeek: v })} disabled={disabled} />
+            <ToggleRow label="Loop" value={config.audioPlayer.loop}
+              onChange={v => update('audioPlayer', { ...config.audioPlayer, loop: v })} disabled={disabled} />
+            <ColorRow label="Player bg" value={config.audioPlayer.playerBg}
+              onChange={v => update('audioPlayer', { ...config.audioPlayer, playerBg: v })} disabled={disabled} />
+            <ColorRow label="Player accent" value={config.audioPlayer.playerAccent}
+              onChange={v => update('audioPlayer', { ...config.audioPlayer, playerAccent: v })} disabled={disabled} />
+          </>
+        )}
+      </Section>
+
+      {/* ─── TOOLBAR ─── */}
+      <Section icon={PanelBottom} title="Toolbar / Action Bar" summary={
+        config.toolbar.enabled ? `${config.toolbar.style}, ${config.toolbar.buttons.filter(b => b.enabled).length} nút` : 'tắt'
+      } enabled={s.toolbar} onToggleEnabled={() => toggleSection('toolbar')}>
+        <ToggleRow label="Bật toolbar" value={config.toolbar.enabled}
+          onChange={v => update('toolbar', { ...config.toolbar, enabled: v })} disabled={disabled} />
+        {config.toolbar.enabled && (
+          <>
+            <RadioRow<ToolbarPosition>
+              label="Vị trí"
+              value={config.toolbar.position}
+              options={[{ value: 'bottom-fixed', label: 'Dưới' }, { value: 'top-fixed', label: 'Trên' }, { value: 'floating-br', label: 'Float ↘' }, { value: 'floating-bl', label: 'Float ↙' }]}
+              onChange={v => update('toolbar', { ...config.toolbar, position: v })} disabled={disabled} />
+            <RadioRow<ToolbarStyle>
+              label="Style"
+              value={config.toolbar.style}
+              options={[{ value: 'pill', label: 'Pill' }, { value: 'flat', label: 'Flat' }, { value: 'glass', label: 'Glass' }, { value: 'minimal', label: 'Minimal' }]}
+              onChange={v => update('toolbar', { ...config.toolbar, style: v })} disabled={disabled} />
+            <ToggleRow label="Hiện labels" value={config.toolbar.showLabels}
+              onChange={v => update('toolbar', { ...config.toolbar, showLabels: v })} disabled={disabled} />
+            <ToggleRow label="Compact (chỉ icon)" value={config.toolbar.compact}
+              onChange={v => update('toolbar', { ...config.toolbar, compact: v })} disabled={disabled} />
+            <ColorRow label="Background" value={config.toolbar.bgColor}
+              onChange={v => update('toolbar', { ...config.toolbar, bgColor: v })} disabled={disabled} />
+            <ColorRow label="Text" value={config.toolbar.textColor}
+              onChange={v => update('toolbar', { ...config.toolbar, textColor: v })} disabled={disabled} />
+
+            {/* Toolbar buttons list */}
+            <div className="space-y-1 pt-1 border-t border-border/30">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-muted-foreground">Các nút toolbar</span>
+                <button onClick={() => update('toolbar', { ...config.toolbar, buttons: [...config.toolbar.buttons, createToolbarButton()] })}
+                  disabled={disabled} className="flex items-center gap-0.5 text-[9px] text-primary hover:underline">
+                  <Plus className="w-3 h-3" /> Thêm
+                </button>
+              </div>
+              {config.toolbar.buttons.map((btn) => (
+                <div key={btn.id} className="flex items-center gap-1.5 p-1.5 rounded bg-muted/10 border border-border/40">
+                  <input type="text" value={btn.emoji} maxLength={4}
+                    onChange={e => update('toolbar', { ...config.toolbar, buttons: config.toolbar.buttons.map(b => b.id === btn.id ? { ...b, emoji: e.target.value } : b) })}
+                    className="w-8 text-center text-[12px] bg-transparent border-none outline-none" />
+                  <input type="text" value={btn.label}
+                    onChange={e => update('toolbar', { ...config.toolbar, buttons: config.toolbar.buttons.map(b => b.id === btn.id ? { ...b, label: e.target.value } : b) })}
+                    className="flex-1 text-[10px] bg-transparent border-none outline-none text-foreground" />
+                  <button onClick={() => update('toolbar', { ...config.toolbar, buttons: config.toolbar.buttons.map(b => b.id === btn.id ? { ...b, enabled: !b.enabled } : b) })}
+                    className={cn('w-2 h-2 rounded-full border', btn.enabled ? 'bg-emerald-400 border-emerald-500/50' : 'bg-transparent border-muted-foreground/40')} />
+                  <button onClick={() => update('toolbar', { ...config.toolbar, buttons: config.toolbar.buttons.filter(b => b.id !== btn.id) })}
+                    className="text-muted-foreground hover:text-destructive"><Trash2 className="w-3 h-3" /></button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </Section>
+
+      {/* ─── READING MODE ─── */}
+      <Section icon={BookOpen} title="Reading / Fullscreen" summary={
+        [config.readingMode.enableFullscreen && 'fullscreen', config.readingMode.enableFontSizeControl && 'font±', config.readingMode.showScrollToTop && '↑top'].filter(Boolean).join(', ') || 'tắt'
+      } enabled={s.readingMode} onToggleEnabled={() => toggleSection('readingMode')}>
+        <ToggleRow label="Nút fullscreen" value={config.readingMode.enableFullscreen}
+          onChange={v => update('readingMode', { ...config.readingMode, enableFullscreen: v })} disabled={disabled} />
+        <ToggleRow label="User chỉnh font size" value={config.readingMode.enableFontSizeControl}
+          onChange={v => update('readingMode', { ...config.readingMode, enableFontSizeControl: v })} disabled={disabled} />
+        {config.readingMode.enableFontSizeControl && (
+          <>
+            <SliderRow label="Font min (px)" value={config.readingMode.fontSizeMin} min={10} max={16} step={1}
+              onChange={v => update('readingMode', { ...config.readingMode, fontSizeMin: v })} disabled={disabled} />
+            <SliderRow label="Font max (px)" value={config.readingMode.fontSizeMax} min={18} max={32} step={1}
+              onChange={v => update('readingMode', { ...config.readingMode, fontSizeMax: v })} disabled={disabled} />
+          </>
+        )}
+        <ToggleRow label="Chỉnh line width" value={config.readingMode.enableLineWidthControl}
+          onChange={v => update('readingMode', { ...config.readingMode, enableLineWidthControl: v })} disabled={disabled} />
+        <ToggleRow label="Nút scroll to top" value={config.readingMode.showScrollToTop}
+          onChange={v => update('readingMode', { ...config.readingMode, showScrollToTop: v })} disabled={disabled} />
+        <ToggleRow label="Chapter navigation" value={config.readingMode.showChapterNav}
+          onChange={v => update('readingMode', { ...config.readingMode, showChapterNav: v })} disabled={disabled} />
+        <ColorRow label="Reading bg" value={config.readingMode.readingBg}
+          onChange={v => update('readingMode', { ...config.readingMode, readingBg: v })} disabled={disabled} />
+      </Section>
+
+      {/* ─── MULTI-PAGE ─── */}
+      <Section icon={FileStack} title="Multi-page / Wizard" summary={
+        config.multiPage.enabled ? `${config.multiPage.pages.filter(p => p.enabled).length} pages, ${config.multiPage.navStyle}` : 'tắt'
+      } enabled={s.multiPage} onToggleEnabled={() => toggleSection('multiPage')}>
+        <ToggleRow label="Bật multi-page" value={config.multiPage.enabled}
+          onChange={v => update('multiPage', { ...config.multiPage, enabled: v })} disabled={disabled} />
+        {config.multiPage.enabled && (
+          <>
+            <RadioRow<PageNavStyle>
+              label="Navigation style"
+              value={config.multiPage.navStyle}
+              options={[{ value: 'dots', label: 'Dots' }, { value: 'arrows', label: 'Arrows' }, { value: 'sidebar', label: 'Sidebar' }, { value: 'tabs', label: 'Tabs' }]}
+              onChange={v => update('multiPage', { ...config.multiPage, navStyle: v })} disabled={disabled} />
+            <RadioRow<SceneTransition>
+              label="Transition"
+              value={config.multiPage.pageTransition}
+              options={[{ value: 'fade', label: 'Fade' }, { value: 'slide-left', label: 'Slide' }, { value: 'zoom', label: 'Zoom' }, { value: 'flip', label: 'Flip' }, { value: 'blur', label: 'Blur' }]}
+              onChange={v => update('multiPage', { ...config.multiPage, pageTransition: v })} disabled={disabled} />
+            <RadioRow<'top' | 'bottom' | 'both'>
+              label="Nav position"
+              value={config.multiPage.navPosition}
+              options={[{ value: 'top', label: 'Trên' }, { value: 'bottom', label: 'Dưới' }, { value: 'both', label: 'Cả hai' }]}
+              onChange={v => update('multiPage', { ...config.multiPage, navPosition: v })} disabled={disabled} />
+            <ToggleRow label="Hiện số trang (1/5)" value={config.multiPage.showPageCounter}
+              onChange={v => update('multiPage', { ...config.multiPage, showPageCounter: v })} disabled={disabled} />
+            <ToggleRow label="Cho nhảy trang" value={config.multiPage.allowDirectJump}
+              onChange={v => update('multiPage', { ...config.multiPage, allowDirectJump: v })} disabled={disabled} />
+
+            {/* Pages list */}
+            <div className="space-y-1 pt-1 border-t border-border/30">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-muted-foreground">Danh sách trang</span>
+                <button onClick={() => update('multiPage', { ...config.multiPage, pages: [...config.multiPage.pages, createPageItem()] })}
+                  disabled={disabled} className="flex items-center gap-0.5 text-[9px] text-primary hover:underline">
+                  <Plus className="w-3 h-3" /> Thêm
+                </button>
+              </div>
+              {config.multiPage.pages.map((pg) => (
+                <div key={pg.id} className="flex items-center gap-1.5 p-1.5 rounded bg-muted/10 border border-border/40">
+                  <input type="text" value={pg.emoji} maxLength={4}
+                    onChange={e => update('multiPage', { ...config.multiPage, pages: config.multiPage.pages.map(p => p.id === pg.id ? { ...p, emoji: e.target.value } : p) })}
+                    className="w-8 text-center text-[12px] bg-transparent border-none outline-none" />
+                  <input type="text" value={pg.label}
+                    onChange={e => update('multiPage', { ...config.multiPage, pages: config.multiPage.pages.map(p => p.id === pg.id ? { ...p, label: e.target.value } : p) })}
+                    className="flex-1 text-[10px] bg-transparent border-none outline-none text-foreground" />
+                  <button onClick={() => update('multiPage', { ...config.multiPage, pages: config.multiPage.pages.map(p => p.id === pg.id ? { ...p, enabled: !p.enabled } : p) })}
+                    className={cn('w-2 h-2 rounded-full border', pg.enabled ? 'bg-emerald-400 border-emerald-500/50' : 'bg-transparent border-muted-foreground/40')} />
+                  <button onClick={() => update('multiPage', { ...config.multiPage, pages: config.multiPage.pages.filter(p => p.id !== pg.id) })}
+                    className="text-muted-foreground hover:text-destructive"><Trash2 className="w-3 h-3" /></button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </Section>
+
+      {/* ─── COLLAPSIBLES ─── */}
+      <Section icon={ChevronUp} title="Collapsible Sections" summary={`${config.collapsibles.iconStyle}, ${config.collapsibles.animation}`}
+        enabled={s.collapsibles} onToggleEnabled={() => toggleSection('collapsibles')}>
+        <RadioRow<'open' | 'closed'>
+          label="Trạng thái mặc định"
+          value={config.collapsibles.defaultState}
+          options={[{ value: 'open', label: 'Mở' }, { value: 'closed', label: 'Đóng' }]}
+          onChange={v => update('collapsibles', { ...config.collapsibles, defaultState: v })} disabled={disabled} />
+        <RadioRow<CollapseIcon>
+          label="Icon style"
+          value={config.collapsibles.iconStyle}
+          options={[{ value: 'arrow', label: '▶ Arrow' }, { value: 'plus-minus', label: '+/- Plus' }, { value: 'chevron', label: '› Chevron' }, { value: 'none', label: 'Không' }]}
+          onChange={v => update('collapsibles', { ...config.collapsibles, iconStyle: v })} disabled={disabled} />
+        <RadioRow<CollapseAnimation>
+          label="Animation"
+          value={config.collapsibles.animation}
+          options={[{ value: 'slide', label: 'Slide' }, { value: 'fade', label: 'Fade' }, { value: 'none', label: 'Không' }]}
+          onChange={v => update('collapsibles', { ...config.collapsibles, animation: v })} disabled={disabled} />
+        <ToggleRow label="Cho phép lồng nhau" value={config.collapsibles.enableNested}
+          onChange={v => update('collapsibles', { ...config.collapsibles, enableNested: v })} disabled={disabled} />
+        <RadioRow<'solid' | 'dashed' | 'none' | 'accent'>
+          label="Border style"
+          value={config.collapsibles.borderStyle}
+          options={[{ value: 'solid', label: 'Solid' }, { value: 'dashed', label: 'Dashed' }, { value: 'accent', label: 'Accent' }, { value: 'none', label: 'Không' }]}
+          onChange={v => update('collapsibles', { ...config.collapsibles, borderStyle: v })} disabled={disabled} />
+        <RadioRow<'bold' | 'accent-bg' | 'underline' | 'plain'>
+          label="Header style"
+          value={config.collapsibles.headerStyle}
+          options={[{ value: 'bold', label: 'Bold' }, { value: 'accent-bg', label: 'Accent bg' }, { value: 'underline', label: 'Underline' }, { value: 'plain', label: 'Plain' }]}
+          onChange={v => update('collapsibles', { ...config.collapsibles, headerStyle: v })} disabled={disabled} />
+        <SliderRow label="Border radius" value={config.collapsibles.borderRadius} min={0} max={16} step={2}
+          onChange={v => update('collapsibles', { ...config.collapsibles, borderRadius: v })} disabled={disabled} />
+      </Section>
+
+      {/* ─── CURRENCY ─── */}
+      <Section icon={Coins} title="Tiền tệ / Economy" summary={`${config.currency.currencies.length} loại, ${config.currency.displayStyle}`}
+        enabled={s.currency} onToggleEnabled={() => toggleSection('currency')}>
+        <RadioRow<'inline' | 'badge' | 'row'>
+          label="Display style"
+          value={config.currency.displayStyle}
+          options={[{ value: 'inline', label: 'Inline' }, { value: 'badge', label: 'Badge' }, { value: 'row', label: 'Row' }]}
+          onChange={v => update('currency', { ...config.currency, displayStyle: v })} disabled={disabled} />
+        <ToggleRow label="Hiện icon" value={config.currency.showIcon}
+          onChange={v => update('currency', { ...config.currency, showIcon: v })} disabled={disabled} />
+        <ToggleRow label="Animate thay đổi" value={config.currency.animateChange}
+          onChange={v => update('currency', { ...config.currency, animateChange: v })} disabled={disabled} />
+        <RadioRow<'full' | 'abbreviated'>
+          label="Format số"
+          value={config.currency.format}
+          options={[{ value: 'full', label: '1500' }, { value: 'abbreviated', label: '1.5K' }]}
+          onChange={v => update('currency', { ...config.currency, format: v })} disabled={disabled} />
+
+        {/* Currencies list */}
+        <div className="space-y-1 pt-1 border-t border-border/30">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-muted-foreground">Danh sách tiền tệ</span>
+            <button onClick={() => update('currency', { ...config.currency, currencies: [...config.currency.currencies, createCurrencyItem()] })}
+              disabled={disabled} className="flex items-center gap-0.5 text-[9px] text-primary hover:underline">
+              <Plus className="w-3 h-3" /> Thêm
+            </button>
+          </div>
+          {config.currency.currencies.map((cur) => (
+            <div key={cur.id} className="flex items-center gap-1.5 p-1.5 rounded bg-muted/10 border border-border/40">
+              <input type="text" value={cur.emoji} maxLength={4}
+                onChange={e => update('currency', { ...config.currency, currencies: config.currency.currencies.map(c => c.id === cur.id ? { ...c, emoji: e.target.value } : c) })}
+                className="w-8 text-center text-[12px] bg-transparent border-none outline-none" />
+              <input type="text" value={cur.name}
+                onChange={e => update('currency', { ...config.currency, currencies: config.currency.currencies.map(c => c.id === cur.id ? { ...c, name: e.target.value } : c) })}
+                className="flex-1 text-[10px] bg-transparent border-none outline-none text-foreground" />
+              <input type="color" value={cur.color}
+                onChange={e => update('currency', { ...config.currency, currencies: config.currency.currencies.map(c => c.id === cur.id ? { ...c, color: e.target.value } : c) })}
+                className="w-5 h-5 rounded border-none cursor-pointer" />
+              <button onClick={() => update('currency', { ...config.currency, currencies: config.currency.currencies.filter(c => c.id !== cur.id) })}
+                className="text-muted-foreground hover:text-destructive"><Trash2 className="w-3 h-3" /></button>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      {/* ─── BADGES ─── */}
+      <Section icon={Award} title="Badges / Titles" summary={
+        config.badges.enabled ? `${config.badges.shape}, ${config.badges.position}` : 'tắt'
+      } enabled={s.badges} onToggleEnabled={() => toggleSection('badges')}>
+        <ToggleRow label="Bật badges" value={config.badges.enabled}
+          onChange={v => update('badges', { ...config.badges, enabled: v })} disabled={disabled} />
+        {config.badges.enabled && (
+          <>
+            <RadioRow<BadgeShape>
+              label="Hình dạng"
+              value={config.badges.shape}
+              options={[{ value: 'pill', label: 'Pill' }, { value: 'circle', label: 'Circle' }, { value: 'square', label: 'Square' }, { value: 'ribbon', label: 'Ribbon' }]}
+              onChange={v => update('badges', { ...config.badges, shape: v })} disabled={disabled} />
+            <RadioRow<BadgePosition>
+              label="Vị trí"
+              value={config.badges.position}
+              options={[{ value: 'inline', label: 'Inline' }, { value: 'floating', label: 'Floating' }, { value: 'header', label: 'Header' }]}
+              onChange={v => update('badges', { ...config.badges, position: v })} disabled={disabled} />
+            <RadioRow<'above-name' | 'below-name' | 'badge'>
+              label="Title display"
+              value={config.badges.titleDisplay}
+              options={[{ value: 'above-name', label: 'Trên tên' }, { value: 'below-name', label: 'Dưới tên' }, { value: 'badge', label: 'Badge' }]}
+              onChange={v => update('badges', { ...config.badges, titleDisplay: v })} disabled={disabled} />
+            <ToggleRow label="Rarity glow" value={config.badges.rarityGlow}
+              onChange={v => update('badges', { ...config.badges, rarityGlow: v })} disabled={disabled} />
+            <SliderRow label="Max visible" value={config.badges.maxVisible} min={1} max={10} step={1}
+              onChange={v => update('badges', { ...config.badges, maxVisible: v })} disabled={disabled} />
+            <ColorRow label="Badge bg" value={config.badges.badgeBg}
+              onChange={v => update('badges', { ...config.badges, badgeBg: v })} disabled={disabled} />
+            <ColorRow label="Badge text" value={config.badges.badgeText}
+              onChange={v => update('badges', { ...config.badges, badgeText: v })} disabled={disabled} />
+          </>
+        )}
+      </Section>
+
+      {/* ─── CSS ADVANCED ─── */}
+      <Section icon={Code2} title="CSS / Advanced" summary={
+        `${config.cssAdvanced.customVariables.length} vars, scrollbar: ${config.cssAdvanced.scrollbarStyle}`
+      } enabled={s.cssAdvanced} onToggleEnabled={() => toggleSection('cssAdvanced')}>
+        <ToggleRow label="Box-sizing reset" value={config.cssAdvanced.boxSizingReset}
+          onChange={v => update('cssAdvanced', { ...config.cssAdvanced, boxSizingReset: v })} disabled={disabled} />
+        <RadioRow<'default' | 'thin' | 'hidden' | 'custom'>
+          label="Scrollbar"
+          value={config.cssAdvanced.scrollbarStyle}
+          options={[{ value: 'default', label: 'Default' }, { value: 'thin', label: 'Thin' }, { value: 'hidden', label: 'Hidden' }, { value: 'custom', label: 'Custom' }]}
+          onChange={v => update('cssAdvanced', { ...config.cssAdvanced, scrollbarStyle: v })} disabled={disabled} />
+        {config.cssAdvanced.scrollbarStyle === 'custom' && (
+          <ColorRow label="Scrollbar color" value={config.cssAdvanced.scrollbarColor}
+            onChange={v => update('cssAdvanced', { ...config.cssAdvanced, scrollbarColor: v })} disabled={disabled} />
+        )}
+        <ColorRow label="Selection text" value={config.cssAdvanced.selectionColor}
+          onChange={v => update('cssAdvanced', { ...config.cssAdvanced, selectionColor: v })} disabled={disabled} />
+        <ColorRow label="Selection bg" value={config.cssAdvanced.selectionBg}
+          onChange={v => update('cssAdvanced', { ...config.cssAdvanced, selectionBg: v })} disabled={disabled} />
+
+        {/* Custom CSS variables */}
+        <div className="space-y-1 pt-1 border-t border-border/30">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-muted-foreground">CSS Variables</span>
+            <button onClick={() => update('cssAdvanced', { ...config.cssAdvanced, customVariables: [...config.cssAdvanced.customVariables, createCssVariable()] })}
+              disabled={disabled} className="flex items-center gap-0.5 text-[9px] text-primary hover:underline">
+              <Plus className="w-3 h-3" /> Thêm
+            </button>
+          </div>
+          {config.cssAdvanced.customVariables.map((v) => (
+            <div key={v.id} className="flex items-center gap-1 p-1.5 rounded bg-muted/10 border border-border/40">
+              <input type="text" value={v.name} placeholder="--var-name"
+                onChange={e => update('cssAdvanced', { ...config.cssAdvanced, customVariables: config.cssAdvanced.customVariables.map(cv => cv.id === v.id ? { ...cv, name: e.target.value } : cv) })}
+                className="w-24 text-[10px] font-mono bg-transparent border-none outline-none text-foreground" />
+              <span className="text-[9px] text-muted-foreground">:</span>
+              <input type="text" value={v.value} placeholder="#fff"
+                onChange={e => update('cssAdvanced', { ...config.cssAdvanced, customVariables: config.cssAdvanced.customVariables.map(cv => cv.id === v.id ? { ...cv, value: e.target.value } : cv) })}
+                className="flex-1 text-[10px] font-mono bg-transparent border-none outline-none text-foreground" />
+              <button onClick={() => update('cssAdvanced', { ...config.cssAdvanced, customVariables: config.cssAdvanced.customVariables.filter(cv => cv.id !== v.id) })}
+                className="text-muted-foreground hover:text-destructive"><Trash2 className="w-3 h-3" /></button>
+            </div>
+          ))}
+        </div>
+
+        {/* Additional font URLs */}
+        <div className="space-y-1 pt-1 border-t border-border/30">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-muted-foreground">Google Fonts bổ sung</span>
+            <button onClick={() => update('cssAdvanced', { ...config.cssAdvanced, additionalFontUrls: [...config.cssAdvanced.additionalFontUrls, ''] })}
+              disabled={disabled} className="flex items-center gap-0.5 text-[9px] text-primary hover:underline">
+              <Plus className="w-3 h-3" /> Thêm
+            </button>
+          </div>
+          {config.cssAdvanced.additionalFontUrls.map((url, i) => (
+            <div key={i} className="flex items-center gap-1 p-1 rounded bg-muted/10 border border-border/40">
+              <input type="text" value={url} placeholder="https://fonts.googleapis.com/css2?family=..."
+                onChange={e => { const urls = [...config.cssAdvanced.additionalFontUrls]; urls[i] = e.target.value; update('cssAdvanced', { ...config.cssAdvanced, additionalFontUrls: urls }); }}
+                className="flex-1 text-[9px] font-mono bg-transparent border-none outline-none text-foreground" />
+              <button onClick={() => update('cssAdvanced', { ...config.cssAdvanced, additionalFontUrls: config.cssAdvanced.additionalFontUrls.filter((_, j) => j !== i) })}
+                className="text-muted-foreground hover:text-destructive"><Trash2 className="w-3 h-3" /></button>
+            </div>
+          ))}
+        </div>
+
+        {/* Custom CSS snippet */}
+        <div className="space-y-1 pt-1 border-t border-border/30">
+          <span className="text-[10px] text-muted-foreground">Custom CSS</span>
+          <textarea
+            value={config.cssAdvanced.customCssSnippet}
+            onChange={e => update('cssAdvanced', { ...config.cssAdvanced, customCssSnippet: e.target.value })}
+            placeholder=".custom-class { color: #fff; }"
+            disabled={disabled}
+            rows={4}
+            className="w-full px-2 py-1.5 rounded text-[10px] font-mono bg-background border border-border resize-y"
+          />
+        </div>
+      </Section>
+
+      {/* ═══ 25. EVENT POPUP ═══ */}
+      <Section title="Event / Popup" icon={AlertCircle} summary={config.eventPopup.enabled ? `${config.eventPopup.layout} • ${config.eventPopup.defaultSeverity}` : ''} enabled={s.eventPopup} onToggleEnabled={() => toggleSection('eventPopup')}>
+        <ToggleRow label="Bật Event Popup" value={config.eventPopup.enabled}
+          onChange={v => update('eventPopup', { ...config.eventPopup, enabled: v })} disabled={disabled} />
+
+        {config.eventPopup.enabled && (
+          <div className="space-y-2">
+            <RadioRow label="Layout" value={config.eventPopup.layout}
+              options={(['centered','side-icon','full-width','compact'] as PopupLayout[]).map(v => ({ value: v, label: v }))}
+              onChange={v => update('eventPopup', { ...config.eventPopup, layout: v as PopupLayout })} disabled={disabled} />
+            <RadioRow label="Severity mặc định" value={config.eventPopup.defaultSeverity}
+              options={(['info','warning','danger','success','royal'] as PopupSeverity[]).map(v => ({ value: v, label: v }))}
+              onChange={v => update('eventPopup', { ...config.eventPopup, defaultSeverity: v as PopupSeverity })} disabled={disabled} />
+            <ToggleRow label="Hiện icon" value={config.eventPopup.showIcon}
+              onChange={v => update('eventPopup', { ...config.eventPopup, showIcon: v })} disabled={disabled} />
+            {config.eventPopup.showIcon && (
+              <RadioRow label="Vị trí icon" value={config.eventPopup.iconPosition}
+                options={[{ value: 'top', label: 'Trên' }, { value: 'left', label: 'Bên trái' }]}
+                onChange={v => update('eventPopup', { ...config.eventPopup, iconPosition: v as 'top'|'left' })} disabled={disabled} />
+            )}
+            <ToggleRow label="Badge mức độ" value={config.eventPopup.showSeverityBadge}
+              onChange={v => update('eventPopup', { ...config.eventPopup, showSeverityBadge: v })} disabled={disabled} />
+            <ToggleRow label="Hiện lựa chọn" value={config.eventPopup.showChoices}
+              onChange={v => update('eventPopup', { ...config.eventPopup, showChoices: v })} disabled={disabled} />
+            {config.eventPopup.showChoices && (
+              <RadioRow label="Kiểu lựa chọn" value={config.eventPopup.choiceStyle}
+                options={[{ value: 'buttons', label: 'Nút bấm' }, { value: 'cards', label: 'Thẻ' }, { value: 'list', label: 'Danh sách' }]}
+                onChange={v => update('eventPopup', { ...config.eventPopup, choiceStyle: v as 'buttons'|'cards'|'list' })} disabled={disabled} />
+            )}
+            <ToggleRow label="Animation vào" value={config.eventPopup.animateEntry}
+              onChange={v => update('eventPopup', { ...config.eventPopup, animateEntry: v })} disabled={disabled} />
+            {config.eventPopup.animateEntry && (
+              <RadioRow label="Loại animation" value={config.eventPopup.entryAnimation}
+                options={[{ value: 'slideDown', label: 'Slide Down' }, { value: 'fadeIn', label: 'Fade In' }, { value: 'scaleUp', label: 'Scale Up' }, { value: 'none', label: 'Không' }]}
+                onChange={v => update('eventPopup', { ...config.eventPopup, entryAnimation: v as 'slideDown'|'fadeIn'|'scaleUp'|'none' })} disabled={disabled} />
+            )}
+            <SliderRow label="Border radius" value={config.eventPopup.borderRadius} min={0} max={20} unit="px"
+              onChange={v => update('eventPopup', { ...config.eventPopup, borderRadius: v })} disabled={disabled} />
+            <ToggleRow label="Nút đóng" value={config.eventPopup.showCloseButton}
+              onChange={v => update('eventPopup', { ...config.eventPopup, showCloseButton: v })} disabled={disabled} />
+
+            <div className="grid grid-cols-3 gap-2 pt-1">
+              <ColorRow label="Nền" value={config.eventPopup.popupBg}
+                onChange={v => update('eventPopup', { ...config.eventPopup, popupBg: v })} disabled={disabled} />
+              <ColorRow label="Viền" value={config.eventPopup.popupBorder}
+                onChange={v => update('eventPopup', { ...config.eventPopup, popupBorder: v })} disabled={disabled} />
+              <ColorRow label="Accent" value={config.eventPopup.popupAccent}
+                onChange={v => update('eventPopup', { ...config.eventPopup, popupAccent: v })} disabled={disabled} />
+            </div>
+          </div>
+        )}
+      </Section>
+
+      {/* ═══ 26. DATA TABLE ═══ */}
+      <Section title="Data Table / Grid" icon={Table2} summary={config.dataTable.enabled ? `${config.dataTable.tableStyle} • ${config.dataTable.density}` : ''} enabled={s.dataTable} onToggleEnabled={() => toggleSection('dataTable')}>
+        <ToggleRow label="Bật Data Table" value={config.dataTable.enabled}
+          onChange={v => update('dataTable', { ...config.dataTable, enabled: v })} disabled={disabled} />
+
+        {config.dataTable.enabled && (
+          <div className="space-y-2">
+            <RadioRow label="Style" value={config.dataTable.tableStyle}
+              options={(['striped','bordered','minimal','card'] as TableStyle[]).map(v => ({ value: v, label: v }))}
+              onChange={v => update('dataTable', { ...config.dataTable, tableStyle: v as TableStyle })} disabled={disabled} />
+            <RadioRow label="Mật độ" value={config.dataTable.density}
+              options={(['compact','normal','spacious'] as TableDensity[]).map(v => ({ value: v, label: v }))}
+              onChange={v => update('dataTable', { ...config.dataTable, density: v as TableDensity })} disabled={disabled} />
+            <ToggleRow label="Hiện header" value={config.dataTable.showHeader}
+              onChange={v => update('dataTable', { ...config.dataTable, showHeader: v })} disabled={disabled} />
+            <ToggleRow label="Sticky header" value={config.dataTable.stickyHeader}
+              onChange={v => update('dataTable', { ...config.dataTable, stickyHeader: v })} disabled={disabled} />
+            <ToggleRow label="Hover highlight" value={config.dataTable.hoverHighlight}
+              onChange={v => update('dataTable', { ...config.dataTable, hoverHighlight: v })} disabled={disabled} />
+            <ToggleRow label="Alternate row color" value={config.dataTable.alternateRowColor}
+              onChange={v => update('dataTable', { ...config.dataTable, alternateRowColor: v })} disabled={disabled} />
+            <ToggleRow label="Cho phép sort" value={config.dataTable.enableSorting}
+              onChange={v => update('dataTable', { ...config.dataTable, enableSorting: v })} disabled={disabled} />
+            <SliderRow label="Border radius" value={config.dataTable.borderRadius} min={0} max={16} unit="px"
+              onChange={v => update('dataTable', { ...config.dataTable, borderRadius: v })} disabled={disabled} />
+            <SliderRow label="Max height" value={config.dataTable.maxHeight} min={0} max={600} unit="px"
+              onChange={v => update('dataTable', { ...config.dataTable, maxHeight: v })} disabled={disabled} />
+
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <ColorRow label="Header BG" value={config.dataTable.headerBg}
+                onChange={v => update('dataTable', { ...config.dataTable, headerBg: v })} disabled={disabled} />
+              <ColorRow label="Header Text" value={config.dataTable.headerText}
+                onChange={v => update('dataTable', { ...config.dataTable, headerText: v })} disabled={disabled} />
+              <ColorRow label="Row BG" value={config.dataTable.rowBg}
+                onChange={v => update('dataTable', { ...config.dataTable, rowBg: v })} disabled={disabled} />
+              <ColorRow label="Row Alt BG" value={config.dataTable.rowAltBg}
+                onChange={v => update('dataTable', { ...config.dataTable, rowAltBg: v })} disabled={disabled} />
+              <ColorRow label="Border" value={config.dataTable.borderColor}
+                onChange={v => update('dataTable', { ...config.dataTable, borderColor: v })} disabled={disabled} />
+            </div>
+          </div>
+        )}
+      </Section>
+
+      {/* ═══ 27. FORM ELEMENTS ═══ */}
+      <Section title="Form Elements" icon={TextCursorInput} summary={config.formElements.enabled ? `${config.formElements.formStyle} • label ${config.formElements.labelStyle}` : ''} enabled={s.formElements} onToggleEnabled={() => toggleSection('formElements')}>
+        <ToggleRow label="Bật Form Elements" value={config.formElements.enabled}
+          onChange={v => update('formElements', { ...config.formElements, enabled: v })} disabled={disabled} />
+
+        {config.formElements.enabled && (
+          <div className="space-y-2">
+            <RadioRow label="Style tổng" value={config.formElements.formStyle}
+              options={(['modern','classic','minimal','parchment'] as FormStyle[]).map(v => ({ value: v, label: v }))}
+              onChange={v => update('formElements', { ...config.formElements, formStyle: v as FormStyle })} disabled={disabled} />
+            <RadioRow label="Label" value={config.formElements.labelStyle}
+              options={[{ value: 'above', label: 'Trên' }, { value: 'inline', label: 'Cùng dòng' }, { value: 'floating', label: 'Nổi' }, { value: 'hidden', label: 'Ẩn' }]}
+              onChange={v => update('formElements', { ...config.formElements, labelStyle: v as 'above'|'inline'|'floating'|'hidden' })} disabled={disabled} />
+            <RadioRow label="Select style" value={config.formElements.selectStyle}
+              options={[{ value: 'native', label: 'Native' }, { value: 'custom-dropdown', label: 'Custom' }]}
+              onChange={v => update('formElements', { ...config.formElements, selectStyle: v as 'native'|'custom-dropdown' })} disabled={disabled} />
+            <SliderRow label="Input radius" value={config.formElements.inputRadius} min={0} max={16} unit="px"
+              onChange={v => update('formElements', { ...config.formElements, inputRadius: v })} disabled={disabled} />
+            <SliderRow label="Input padding" value={config.formElements.inputPadding} min={4} max={16} unit="px"
+              onChange={v => update('formElements', { ...config.formElements, inputPadding: v })} disabled={disabled} />
+            <SliderRow label="Khoảng cách field" value={config.formElements.fieldGap} min={4} max={20} unit="px"
+              onChange={v => update('formElements', { ...config.formElements, fieldGap: v })} disabled={disabled} />
+            <ToggleRow label="Fieldset border" value={config.formElements.fieldsetBorder}
+              onChange={v => update('formElements', { ...config.formElements, fieldsetBorder: v })} disabled={disabled} />
+
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <ColorRow label="Input BG" value={config.formElements.inputBg}
+                onChange={v => update('formElements', { ...config.formElements, inputBg: v })} disabled={disabled} />
+              <ColorRow label="Input Border" value={config.formElements.inputBorder}
+                onChange={v => update('formElements', { ...config.formElements, inputBorder: v })} disabled={disabled} />
+              <ColorRow label="Input Text" value={config.formElements.inputText}
+                onChange={v => update('formElements', { ...config.formElements, inputText: v })} disabled={disabled} />
+              <ColorRow label="Focus Ring" value={config.formElements.focusColor}
+                onChange={v => update('formElements', { ...config.formElements, focusColor: v })} disabled={disabled} />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/30">
+              <ColorRow label="Slider Accent" value={config.formElements.sliderAccent}
+                onChange={v => update('formElements', { ...config.formElements, sliderAccent: v })} disabled={disabled} />
+              <ColorRow label="Slider Track" value={config.formElements.sliderTrackBg}
+                onChange={v => update('formElements', { ...config.formElements, sliderTrackBg: v })} disabled={disabled} />
+              <ColorRow label="Submit BG" value={config.formElements.buttonSubmitBg}
+                onChange={v => update('formElements', { ...config.formElements, buttonSubmitBg: v })} disabled={disabled} />
+              <ColorRow label="Submit Text" value={config.formElements.buttonSubmitText}
+                onChange={v => update('formElements', { ...config.formElements, buttonSubmitText: v })} disabled={disabled} />
+              <ColorRow label="Cancel BG" value={config.formElements.buttonCancelBg}
+                onChange={v => update('formElements', { ...config.formElements, buttonCancelBg: v })} disabled={disabled} />
+              <ColorRow label="Cancel Text" value={config.formElements.buttonCancelText}
+                onChange={v => update('formElements', { ...config.formElements, buttonCancelText: v })} disabled={disabled} />
+            </div>
+          </div>
         )}
       </Section>
     </div>

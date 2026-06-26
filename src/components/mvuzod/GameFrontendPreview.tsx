@@ -33,7 +33,7 @@ import { DEFAULT_GAME_UI_CONFIG } from '../../lib/mvuzod/gameUiDefaults';
 // TYPES
 // ═══════════════════════════════════════════════════════════════════════════
 
-type GameComponent = 'status_bar' | 'opening_form' | 'game_screen' | 'full_set';
+type GameComponent = 'status_bar' | 'opening_form' | 'game_screen' | 'full_set' | 'free_form';
 
 interface ComponentOption {
   id: GameComponent;
@@ -47,6 +47,7 @@ const COMPONENTS: ComponentOption[] = [
   { id: 'opening_form', label: 'Opening Form', icon: FormInput, desc: 'Regex render form mở đầu' },
   { id: 'game_screen', label: 'Game Screen', icon: Monitor, desc: 'Regex render màn hình game' },
   { id: 'full_set', label: 'Bộ đầy đủ', icon: Layers, desc: 'Tạo tất cả + MVUZOD boilerplate' },
+  { id: 'free_form', label: 'Tự do', icon: Wand2, desc: 'Viết mô tả tự do — AI tạo regex theo ý bạn' },
 ];
 
 // Placement label map
@@ -309,46 +310,100 @@ export function GameFrontendPreview({ schema }: GameFrontendPreviewProps) {
         })}
       </div>
 
-      {/* UI Config Panel */}
-      <GameUIConfigPanel
-        config={uiConfig}
-        onChange={setUIConfig}
-        disabled={generating}
-      />
-
-      {/* Custom instructions toggle + input */}
-      <div className="space-y-2">
-        <button
-          onClick={() => setShowCustomInput(!showCustomInput)}
-          disabled={generating}
-          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-        >
-          {showCustomInput ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-          <Sparkles className="w-3 h-3" />
-          Yêu cầu bổ sung (ghi đè / mô tả thêm cho AI)
-        </button>
-
-        {showCustomInput && (
+      {/* ─── FREE-FORM: primary textarea ─── */}
+      {selectedComponent === 'free_form' && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-1.5">
+            <Wand2 className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-xs font-medium text-amber-300">Mô tả Regex bạn muốn AI tạo</span>
+            <span className="text-[10px] text-muted-foreground">(bắt buộc)</span>
+          </div>
           <textarea
             value={customInstructions}
             onChange={e => setCustomInstructions(e.target.value)}
             disabled={generating}
-            placeholder="Ví dụ: Thêm hiệu ứng đặc biệt cho NPC boss, đổi màu nền khi HP thấp, thêm nhạc nền..."
-            className="w-full px-3 py-2.5 text-xs rounded-lg border border-border bg-background
-              placeholder:text-muted-foreground/50 resize-none
-              focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
-            rows={3}
+            placeholder={`Mô tả chi tiết regex bạn muốn tạo. Ví dụ:
+
+• Tạo regex wrap tất cả đoạn hội thoại trong thẻ <details> với summary là tên nhân vật
+• Tạo regex render bảng skills dạng grid 3 cột với icon và level
+• Tạo regex thay tag <battle> thành UI chiến đấu có HP bar, damage animation
+• Tạo regex auto-add nhạc nền khi AI output có keyword "đêm trăng"
+• Tạo bộ regex hoàn chỉnh cho giao diện tu tiên với nhiều trang
+
+Bạn có thể viết tự do — AI sẽ tạo regex scripts theo mô tả.`}
+            className="w-full px-3 py-3 text-xs rounded-lg border-2 border-amber-500/30 bg-amber-500/5
+              placeholder:text-muted-foreground/40 resize-y
+              focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400/40 transition-all"
+            rows={6}
           />
-        )}
-      </div>
+          {!customInstructions.trim() && (
+            <p className="text-[10px] text-amber-500/70 flex items-center gap-1">
+              <AlertTriangle className="w-3 h-3" />
+              Cần nhập mô tả để AI biết tạo regex gì
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* UI Config Panel — always show for presets, collapsible for free_form */}
+      {selectedComponent !== 'free_form' ? (
+        <GameUIConfigPanel
+          config={uiConfig}
+          onChange={setUIConfig}
+          disabled={generating}
+        />
+      ) : (
+        <details className="group">
+          <summary className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer transition-colors select-none">
+            <ChevronRight className="w-3 h-3 group-open:rotate-90 transition-transform" />
+            <Sparkles className="w-3 h-3" />
+            Cấu hình UI nâng cao (tuỳ chọn)
+          </summary>
+          <div className="mt-2">
+            <GameUIConfigPanel
+              config={uiConfig}
+              onChange={setUIConfig}
+              disabled={generating}
+            />
+          </div>
+        </details>
+      )}
+
+      {/* Custom instructions toggle + input — only for non-free_form modes */}
+      {selectedComponent !== 'free_form' && (
+        <div className="space-y-2">
+          <button
+            onClick={() => setShowCustomInput(!showCustomInput)}
+            disabled={generating}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {showCustomInput ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+            <Sparkles className="w-3 h-3" />
+            Yêu cầu bổ sung (ghi đè / mô tả thêm cho AI)
+          </button>
+
+          {showCustomInput && (
+            <textarea
+              value={customInstructions}
+              onChange={e => setCustomInstructions(e.target.value)}
+              disabled={generating}
+              placeholder="Ví dụ: Thêm hiệu ứng đặc biệt cho NPC boss, đổi màu nền khi HP thấp, thêm nhạc nền..."
+              className="w-full px-3 py-2.5 text-xs rounded-lg border border-border bg-background
+                placeholder:text-muted-foreground/50 resize-none
+                focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
+              rows={3}
+            />
+          )}
+        </div>
+      )}
 
       {/* Generate button */}
       <div className="flex items-center gap-3">
         <button
           onClick={handleGenerate}
-          disabled={generating}
+          disabled={generating || (selectedComponent === 'free_form' && !customInstructions.trim())}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-            generating
+            generating || (selectedComponent === 'free_form' && !customInstructions.trim())
               ? 'bg-muted text-muted-foreground cursor-not-allowed'
               : 'bg-gradient-to-r from-violet-500 to-purple-500 text-white hover:opacity-90 shadow-lg shadow-violet-500/20'
           }`}

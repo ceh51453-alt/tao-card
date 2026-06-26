@@ -109,7 +109,7 @@ CHỈ trả về JSON. KHÔNG markdown, KHÔNG giải thích bên ngoài JSON.
 
 // ─── USER PROMPT BUILDERS ───────────────────────────────────────────────────
 
-type GameComponent = 'status_bar' | 'opening_form' | 'game_screen' | 'full_set';
+type GameComponent = 'status_bar' | 'opening_form' | 'game_screen' | 'full_set' | 'free_form';
 
 /**
  * Build user prompt cho AI, bao gồm schema + existing scripts + custom instructions.
@@ -140,15 +140,15 @@ Nếu đã có scripts render <StatusPlaceHolderImpl/>, KHÔNG tạo lại.`);
   }
 
   // 3. Component-specific instructions
-  parts.push(getComponentPrompt(component, schema));
+  parts.push(getComponentPrompt(component, schema, customInstructions));
 
   // 4. UI Config (structured settings)
   if (uiConfig) {
     parts.push(formatConfigForPrompt(uiConfig));
   }
 
-  // 5. Custom instructions from user
-  if (customInstructions?.trim()) {
+  // 5. Custom instructions from user (skip for free_form — already embedded in step 3)
+  if (component !== 'free_form' && customInstructions?.trim()) {
     parts.push(`=== YÊU CẦU BỔ SUNG TỪ NGƯỜI DÙNG ===\n${customInstructions.trim()}`);
   }
 
@@ -157,7 +157,7 @@ Nếu đã có scripts render <StatusPlaceHolderImpl/>, KHÔNG tạo lại.`);
 
 // ─── COMPONENT-SPECIFIC PROMPTS ─────────────────────────────────────────────
 
-function getComponentPrompt(component: GameComponent, schema: MVUZODSchema): string {
+function getComponentPrompt(component: GameComponent, schema: MVUZODSchema, customInstructions?: string): string {
   switch (component) {
     case 'status_bar':
       return buildStatusBarPrompt(schema);
@@ -167,6 +167,8 @@ function getComponentPrompt(component: GameComponent, schema: MVUZODSchema): str
       return buildGameScreenPrompt(schema);
     case 'full_set':
       return buildFullSetPrompt(schema);
+    case 'free_form':
+      return buildFreeFormPrompt(schema, customInstructions ?? '');
   }
 }
 
@@ -270,6 +272,31 @@ ${formatSchemaForPrompt(schema)}
 Tổng cộng nên tạo 5-8 scripts. Thứ tự quan trọng:
 - Scripts promptOnly (ẩn khỏi AI) phải ĐẶT TRƯỚC scripts markdownOnly (render)
 - Scripts ẩn tag phải đặt trước scripts render cùng tag`;
+}
+
+function buildFreeFormPrompt(schema: MVUZODSchema, instructions: string): string {
+  const fields = schema.fields.filter(f => !f.constraints?.hidden);
+
+  return `=== YÊU CẦU: TẠO REGEX SCRIPTS TỰ DO ===
+
+Người dùng mô tả tự do regex scripts cần tạo. Hãy đọc kỹ mô tả bên dưới và tạo CHÍNH XÁC theo yêu cầu.
+
+=== MÔ TẢ TỪ NGƯỜI DÙNG ===
+${instructions}
+
+=== CONTEXT: SCHEMA CỦA CARD ===
+Schema có ${fields.length} field gốc:
+${fields.map(f => `  - ${f.label} (${f.type}${f.children?.length ? `, ${f.children.length} children` : ''})`).join('\n')}
+
+=== HƯỚNG DẪN CHUNG ===
+1. Tạo số lượng scripts phù hợp với yêu cầu (1 script đơn giản → nhiều scripts nếu yêu cầu phức tạp)
+2. findRegex: chọn pattern phù hợp — có thể là tag HTML, keyword, pattern tùy ý
+3. replaceString: HTML với inline styles, design premium dark theme
+4. Dùng placement=[2] (AI Output) trừ khi yêu cầu khác
+5. markdownOnly=true cho scripts render UI đẹp
+6. Có thể dùng TavernHelper EJS: <% const data = Mvu.getMvuData({type:'message',message_id:'latest'})?.stat_data ?? {}; %>
+7. KHÔNG bắt buộc phải liên quan đến StatusPlaceHolderImpl hay UpdateVariable
+8. Tự do sáng tạo theo mô tả người dùng`;
 }
 
 // ─── HELPERS ────────────────────────────────────────────────────────────────
@@ -474,6 +501,161 @@ function formatConfigForPrompt(config: GameUIConfig): string {
 - Compact mode: ${r.compactModeOnMobile ? 'có' : 'không'}, hide images: ${r.hideImagesOnMobile ? 'có' : 'không'}
 - Stack columns: ${r.stackColumnsOnMobile ? 'có' : 'không'}, touch-friendly: ${r.touchFriendly ? 'có' : 'không'}
 - Swipe gestures: ${r.swipeGestures ? 'có' : 'không'}`);
+  }
+
+  // Theme
+  if (en.theme) {
+    const th = config.theme;
+    if (th.enableDualTheme) {
+      sections.push(`THEME (DUAL MODE):
+- Default: ${th.defaultTheme}, auto-detect: ${th.autoDetect ? 'có' : 'không'}
+- Light colors: bg=${th.lightBg}, text=${th.lightText}, accent=${th.lightAccent}, surface=${th.lightSurface}
+- Eye care: ${th.enableEyeCare ? `sepia ${th.eyeCareStrength}%` : 'tắt'}`);
+    } else if (th.enableEyeCare) {
+      sections.push(`THEME: Eye care mode, sepia ${th.eyeCareStrength}%`);
+    }
+  }
+
+  // Retro Effects
+  if (en.retroEffects) {
+    const re = config.retroEffects;
+    const retroList: string[] = [];
+    if (re.enableScanlines) retroList.push(`scanlines (opacity: ${re.scanlineOpacity}, gap: ${re.scanlineGap}px)`);
+    if (re.enableCrtVignette) retroList.push(`CRT vignette (${re.crtIntensity}%)`);
+    if (re.enableNoiseTexture) retroList.push(`noise (${re.noiseOpacity})`);
+    if (re.enableTerminalStyle) retroList.push('terminal style (monospace, green-on-black)');
+    if (re.customOverlayUrl) retroList.push(`overlay: ${re.customOverlayUrl} (${re.overlayBlendMode})`);
+    if (retroList.length > 0) {
+      sections.push(`RETRO / CRT EFFECTS:\n${retroList.map(x => `- ${x}`).join('\n')}`);
+    }
+  }
+
+  // Audio Player
+  if (en.audioPlayer && config.audioPlayer.enabled) {
+    const ap = config.audioPlayer;
+    sections.push(`AUDIO PLAYER:
+- Style: ${ap.playerStyle}, position: ${ap.position}
+- Track: "${ap.trackLabel}" ${ap.defaultTrackUrl ? `(${ap.defaultTrackUrl})` : '(no URL)'}
+- Auto-play: ${ap.autoPlay ? 'có' : 'không'}, loop: ${ap.loop ? 'có' : 'không'}
+- Controls: ${[ap.showVolume && 'volume', ap.showSeek && 'seek'].filter(Boolean).join(', ')}
+- Colors: bg=${ap.playerBg}, accent=${ap.playerAccent}`);
+  }
+
+  // Toolbar
+  if (en.toolbar && config.toolbar.enabled) {
+    const tb = config.toolbar;
+    const enabledBtns = tb.buttons.filter(b => b.enabled);
+    sections.push(`TOOLBAR / ACTION BAR:
+- Position: ${tb.position}, style: ${tb.style}, compact: ${tb.compact ? 'có' : 'không'}
+- Labels: ${tb.showLabels ? 'hiện' : 'ẩn'}
+- Colors: bg=${tb.bgColor}, text=${tb.textColor}
+- ${enabledBtns.length} nút: ${enabledBtns.map(b => `${b.emoji} ${b.label} (${b.action})`).join(', ')}`);
+  }
+
+  // Reading Mode
+  if (en.readingMode) {
+    const rm = config.readingMode;
+    const rmFeatures = [
+      rm.enableFullscreen && 'fullscreen',
+      rm.enableFontSizeControl && `font ${rm.fontSizeMin}-${rm.fontSizeMax}px`,
+      rm.enableLineWidthControl && 'line-width',
+      rm.showScrollToTop && 'scroll-top',
+      rm.showChapterNav && 'chapter-nav',
+    ].filter(Boolean);
+    if (rmFeatures.length > 0) {
+      sections.push(`READING MODE:\n${rmFeatures.map(x => `- ${x}`).join('\n')}\n- Reading bg: ${rm.readingBg}`);
+    }
+  }
+
+  // Multi-page
+  if (en.multiPage && config.multiPage.enabled) {
+    const mp = config.multiPage;
+    const enabledPages = mp.pages.filter(p => p.enabled);
+    sections.push(`MULTI-PAGE / WIZARD:
+- Nav: ${mp.navStyle}, position: ${mp.navPosition}, transition: ${mp.pageTransition}
+- Counter: ${mp.showPageCounter ? 'hiện' : 'ẩn'}, direct jump: ${mp.allowDirectJump ? 'có' : 'không'}
+- ${enabledPages.length} pages: ${enabledPages.map(p => `${p.emoji} ${p.label}`).join(', ')}`);
+  }
+
+  // Collapsibles
+  if (en.collapsibles) {
+    const cl = config.collapsibles;
+    sections.push(`COLLAPSIBLE SECTIONS:
+- Default: ${cl.defaultState}, icon: ${cl.iconStyle}, animation: ${cl.animation}
+- Nested: ${cl.enableNested ? 'có' : 'không'}, border: ${cl.borderStyle}, header: ${cl.headerStyle}
+- Border radius: ${cl.borderRadius}px`);
+  }
+
+  // Currency
+  if (en.currency && config.currency.currencies.length > 0) {
+    const cr = config.currency;
+    sections.push(`CURRENCY / ECONOMY:
+- Display: ${cr.displayStyle}, format: ${cr.format}, icon: ${cr.showIcon ? 'hiện' : 'ẩn'}, animate: ${cr.animateChange ? 'có' : 'không'}
+- Currencies: ${cr.currencies.map(c => `${c.emoji} ${c.name} (${c.color})`).join(', ')}`);
+  }
+
+  // Badges
+  if (en.badges && config.badges.enabled) {
+    const bg = config.badges;
+    sections.push(`BADGES / TITLES:
+- Shape: ${bg.shape}, position: ${bg.position}, title: ${bg.titleDisplay}
+- Rarity glow: ${bg.rarityGlow ? 'có' : 'không'}, max: ${bg.maxVisible}
+- Colors: bg=${bg.badgeBg}, text=${bg.badgeText}`);
+  }
+
+  // CSS Advanced
+  if (en.cssAdvanced) {
+    const css = config.cssAdvanced;
+    const cssParts: string[] = [];
+    cssParts.push(`box-sizing reset: ${css.boxSizingReset ? 'có' : 'không'}`);
+    cssParts.push(`scrollbar: ${css.scrollbarStyle}${css.scrollbarStyle === 'custom' ? ` (${css.scrollbarColor})` : ''}`);
+    cssParts.push(`::selection: color=${css.selectionColor}, bg=${css.selectionBg}`);
+    if (css.customVariables.length > 0) {
+      cssParts.push(`CSS vars: ${css.customVariables.map(v => `${v.name}: ${v.value}`).join('; ')}`);
+    }
+    if (css.additionalFontUrls.length > 0) {
+      cssParts.push(`Extra fonts: ${css.additionalFontUrls.filter(u => u).join(', ')}`);
+    }
+    if (css.customCssSnippet) {
+      cssParts.push(`Custom CSS snippet: \`\`\`${css.customCssSnippet}\`\`\``);
+    }
+    sections.push(`CSS / ADVANCED:\n${cssParts.map(x => `- ${x}`).join('\n')}`);
+  }
+
+  // Event Popup
+  if (en.eventPopup && config.eventPopup.enabled) {
+    const ep = config.eventPopup;
+    sections.push(`EVENT / POPUP:
+- Layout: ${ep.layout}, severity: ${ep.defaultSeverity}
+- Icon: ${ep.showIcon ? `${ep.iconPosition}` : 'ẩn'}, severity badge: ${ep.showSeverityBadge ? 'có' : 'không'}
+- Choices: ${ep.showChoices ? `${ep.choiceStyle}` : 'không hiện'}
+- Animation: ${ep.animateEntry ? ep.entryAnimation : 'không'}, radius: ${ep.borderRadius}px
+- Close button: ${ep.showCloseButton ? 'có' : 'không'}
+- Colors: bg=${ep.popupBg}, border=${ep.popupBorder}, accent=${ep.popupAccent}`);
+  }
+
+  // Data Table
+  if (en.dataTable && config.dataTable.enabled) {
+    const dt = config.dataTable;
+    sections.push(`DATA TABLE / GRID:
+- Style: ${dt.tableStyle}, density: ${dt.density}
+- Header: ${dt.showHeader ? 'hiện' : 'ẩn'}, sticky: ${dt.stickyHeader ? 'có' : 'không'}
+- Hover: ${dt.hoverHighlight ? 'có' : 'không'}, alternate rows: ${dt.alternateRowColor ? 'có' : 'không'}
+- Sort: ${dt.enableSorting ? 'có' : 'không'}, radius: ${dt.borderRadius}px, max-height: ${dt.maxHeight || 'auto'}
+- Colors: header=${dt.headerBg}/${dt.headerText}, row=${dt.rowBg}/${dt.rowAltBg}, border=${dt.borderColor}`);
+  }
+
+  // Form Elements
+  if (en.formElements && config.formElements.enabled) {
+    const fe = config.formElements;
+    sections.push(`FORM ELEMENTS:
+- Style: ${fe.formStyle}, label: ${fe.labelStyle}, select: ${fe.selectStyle}
+- Input: bg=${fe.inputBg}, border=${fe.inputBorder}, text=${fe.inputText}
+- Input radius: ${fe.inputRadius}px, padding: ${fe.inputPadding}px, gap: ${fe.fieldGap}px
+- Focus: ${fe.focusColor}, fieldset border: ${fe.fieldsetBorder ? 'có' : 'không'}
+- Slider: accent=${fe.sliderAccent}, track=${fe.sliderTrackBg}
+- Submit btn: bg=${fe.buttonSubmitBg}, text=${fe.buttonSubmitText}
+- Cancel btn: bg=${fe.buttonCancelBg}, text=${fe.buttonCancelText}`);
   }
 
   return `=== CẤU HÌNH GIAO DIỆN (từ config panel) ===
