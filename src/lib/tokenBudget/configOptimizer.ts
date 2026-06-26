@@ -73,6 +73,30 @@ export function optimizeConfigs(
       const extPatches: Partial<LorebookEntry['extensions']> = {};
       let needsPatch = false;
 
+      // ═══ CRITICAL FIX: Entries managed by TCTRL must be non-constant ═══
+      // In SillyTavern, `constant: true` entries are ALWAYS injected into context
+      // regardless of setEntryEnabled(). To allow TCTRL EJS to control them,
+      // we must set constant=false so setEntryEnabled() actually works.
+      //
+      // Exception: Core system entries (hierarchy 1-2) stay constant because
+      // TCTRL won't disable them anyway (they're critical).
+      if (entry.constant && group.strategy !== 'constant') {
+        patches.push({
+          entryId: entry.id,
+          patches: {
+            constant: false,
+          },
+          reason: `constant → false: Để @@TCTRL có thể điều khiển bật/tắt entry "${entry.comment}"`,
+        });
+        configChangedCount++;
+        log(`  ⚙️ "${entry.comment}": constant=false (để EJS điều khiển được)`);
+      }
+
+      // ═══ LOW PRIORITY entries in normal groups: ensure non-constant ═══
+      if (analyzed?.priority === 'low' && entry.constant) {
+        log(`  ⚙️ "${entry.comment}": priority LOW + constant → đổi thành non-constant`);
+      }
+
       // scan_depth optimization
       const targetScanDepth = getScanDepthForGroup(group);
       if (targetScanDepth !== null && entry.extensions.scan_depth !== targetScanDepth) {
@@ -169,6 +193,9 @@ export function applyConfigPatches(
 
     if (p.enabled !== undefined) {
       update.enabled = p.enabled;
+    }
+    if (p.constant !== undefined) {
+      update.constant = p.constant;
     }
     if (p.insertion_order !== undefined) {
       update.insertion_order = p.insertion_order;

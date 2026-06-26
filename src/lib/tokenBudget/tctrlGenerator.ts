@@ -6,7 +6,7 @@
  */
 
 import type { LorebookEntry } from '../../types/lorebook.types';
-import type { ProxyProfile, GenerationParams, ChatMessage } from '../../types';
+import type { ChatMessage } from '../../types';
 import { callAI } from '../ai/client';
 import { DEFAULT_ENTRY_EXT } from '../../types/lorebook.types';
 import type { TctrlAnalysis, TctrlGroup } from './groupBuilder';
@@ -37,6 +37,7 @@ export interface ConfigPatch {
   patches: Partial<{
     extensions: Partial<LorebookEntry['extensions']>;
     enabled: boolean;
+    constant: boolean;
     insertion_order: number;
   }>;
   reason: string;
