@@ -10,7 +10,7 @@ import {
   HelpCircle
 } from 'lucide-react';
 import { useCardStore } from '../../store/cardStore';
-import { importCard, exportCardV3, exportStandaloneLorebook, exportCharacterOnly } from '../../lib/converters/lorebookConvert';
+import { importCard, exportCardV3, exportCardV2Compat, exportStandaloneLorebook, exportCharacterOnly } from '../../lib/converters/lorebookConvert';
 import { extractCharaFromPng, writeCharaToPng, convertToPngBuffer, getDefaultCardPng } from '../../lib/converters/pngMetadata';
 import type { ImportFormat } from '../../lib/converters/lorebookConvert';
 import { cn } from '../../lib/utils';
@@ -212,7 +212,8 @@ export function TopBar({ onToggleSidebar }: TopBarProps) {
 
   const handleExportPng = useCallback(async () => {
     try {
-      const cardV3Json = exportCardV3(card);
+      const v3Json = exportCardV3(card);
+      const v2Json = exportCardV2Compat(card);
       let pngBuffer: ArrayBuffer;
 
       if (card.avatar && card.avatar.startsWith('data:image/')) {
@@ -222,8 +223,8 @@ export function TopBar({ onToggleSidebar }: TopBarProps) {
         pngBuffer = await getDefaultCardPng(card.data.name);
       }
 
-      // Embed the metadata
-      const outputBuffer = writeCharaToPng(pngBuffer, cardV3Json);
+      // Embed the metadata (ccv3 + chara chunks)
+      const outputBuffer = writeCharaToPng(pngBuffer, v3Json, v2Json);
 
       // Download
       const blob = new Blob([outputBuffer], { type: 'image/png' });

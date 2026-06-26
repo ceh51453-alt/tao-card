@@ -11,12 +11,13 @@
  *   Right: Field Detail Editor + Actions + Live Zod Code Preview
  */
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import {
   Plus, Trash2, ChevronRight, ChevronDown, Wand2,
   FileJson, Copy, CheckCircle, AlertTriangle, EyeOff,
   Lock, FolderPlus,
   Code, Layers, Scan, RotateCcw,
+  Zap, ListOrdered, LayoutList, Square,
 } from 'lucide-react';
 import { useCardStore } from '../../store/cardStore';
 import type { MVUZODSchema, MVUZODField, MVUZODConstraints } from '../../types/mvuzod.types';
@@ -320,62 +321,230 @@ function SchemaSourcePanel({
   const [jsonInput, setJsonInput] = useState('');
   const [showJsonImport, setShowJsonImport] = useState(false);
 
+  // Scan mode state
+  type ScanMode = 'all' | 'single' | 'batch';
+  const [scanMode, setScanMode] = useState<ScanMode>('all');
+  const [batchSize, setBatchSize] = useState(5);
+  const [parallelCount, setParallelCount] = useState(1);
+  const [scanProgress, setScanProgress] = useState<{ current: number; total: number; results: string[] } | null>(null);
+  const cancelRef = useRef(false);
+
   const entryCount = entries.length;
-  const canAnalyze = entryCount >= 5;
+  const canAnalyze = entryCount >= 1;
+
+  // Core AI call for a subset of entries
+  const callAIForEntries = useCallback(async (
+    subset: typeof entries,
+    label: string,
+  ): Promise<string> => {
+    const activeProfile = useSettingsStore.getState().getActiveProfile();
+    const params = useSettingsStore.getState().generationParams;
+    if (!activeProfile || !activeProfile.apiKey) {
+      throw new Error('Chưa cấu hình API AI. Vào Settings → API Key.');
+    }
+
+    setLoadingStatus(`${label} — Gửi ${subset.length} entries tới ${activeProfile.label}...`);
+
+    const formattedEntries = subset
+      .map(e => `ID: ${e.id}\nComment: ${e.comment}\nKeys: ${e.keys.join(',')}\nContent:\n${e.content}`)
+      .join('\n\n---\n\n');
+
+    const messages: ChatMessage[] = [
+      { role: 'system', content: MVUZOD_SCHEMA_INFERENCE_PROMPT },
+      { role: 'user', content: `Dưới đây là ${subset.length} entries:\n\n${formattedEntries}\n\nPhân tích và trả về JSON.` },
+    ];
+
+    let fullText = '';
+    let isTruncated = true;
+    let callCount = 0;
+    let currentMessages = messages;
+
+    while (isTruncated && callCount < 4) {
+      callCount++;
+      if (callCount > 1) setLoadingStatus(`${label} — Tiếp tục phản hồi (lượt ${callCount})...`);
+
+      const response = await callAI({
+        profile: activeProfile,
+        params: { ...params, useJsonResponseFormat: true },
+        messages: currentMessages,
+      });
+
+      fullText += response.text;
+      isTruncated = ['MAX_TOKENS', 'max_tokens', 'length'].includes(response.finishReason || '');
+
+      if (isTruncated && response.text.trim()) {
+        currentMessages = [
+          ...currentMessages,
+          { role: 'assistant', content: response.text },
+          { role: 'user', content: 'Viết tiếp phần còn thiếu.' },
+        ];
+      } else {
+        isTruncated = false;
+      }
+    }
+
+    return fullText;
+  }, []);
+
+  // Merge multiple partial schemas into one via AI
+  const mergeSchemas = useCallback(async (partialResults: string[]): Promise<string> => {
+    const activeProfile = useSettingsStore.getState().getActiveProfile();
+    const params = useSettingsStore.getState().generationParams;
+    if (!activeProfile || !activeProfile.apiKey) {
+      throw new Error('Chưa cấu hình API AI. Vào Settings → API Key.');
+    }
+
+    setLoadingStatus('Tổng hợp kết quả từ các batch...');
+
+    const mergePrompt = `Bạn là AI chuyên gia tổng hợp MVUZOD schema.
+
+Dưới đây là ${partialResults.length} kết quả phân tích schema từ các batch entries khác nhau.
+Hãy MERGE (hợp nhất) tất cả thành MỘT schema duy nhất.
+
+Quy tắc merge:
+• Gộp các fields trùng path thành một, giữ constraints đầy đủ nhất
+• Gộp enum values từ các batch
+• Gộp analysis.groups, cộng dồn count
+• Giữ warnings từ tất cả batch
+• Trả về đúng cấu trúc JSON như MVUZOD_SCHEMA_INFERENCE_PROMPT yêu cầu
+
+CHỈ trả về JSON, KHÔNG giải thích.`;
+
+    const batchSummary = partialResults.map((r, i) => `=== Batch ${i + 1} ===\n${r}`).join('\n\n');
+
+    const messages: ChatMessage[] = [
+      { role: 'system', content: mergePrompt },
+      { role: 'user', content: batchSummary },
+    ];
+
+    let fullText = '';
+    let isTruncated = true;
+    let callCount = 0;
+    let currentMessages = messages;
+
+    while (isTruncated && callCount < 4) {
+      callCount++;
+      const response = await callAI({
+        profile: activeProfile,
+        params: { ...params, useJsonResponseFormat: true },
+        messages: currentMessages,
+      });
+      fullText += response.text;
+      isTruncated = ['MAX_TOKENS', 'max_tokens', 'length'].includes(response.finishReason || '');
+      if (isTruncated && response.text.trim()) {
+        currentMessages = [
+          ...currentMessages,
+          { role: 'assistant', content: response.text },
+          { role: 'user', content: 'Viết tiếp phần còn thiếu.' },
+        ];
+      } else {
+        isTruncated = false;
+      }
+    }
+
+    return fullText;
+  }, []);
 
   const handleAIAnalyze = useCallback(async () => {
     setLoading(true);
     setError(null);
+    cancelRef.current = false;
+    setScanProgress(null);
     setLoadingStatus('Đang kết nối AI...');
+
     try {
-      const activeProfile = useSettingsStore.getState().getActiveProfile();
-      const params = useSettingsStore.getState().generationParams;
-      if (!activeProfile || !activeProfile.apiKey) {
-        throw new Error('Chưa cấu hình API AI. Vào Settings → API Key.');
-      }
+      let finalText: string;
 
-      setLoadingStatus(`Gửi ${entryCount} entries tới ${activeProfile.label}...`);
+      if (scanMode === 'all') {
+        // ─── Mode 1: Quét tất cả cùng lúc ───
+        finalText = await callAIForEntries(entries, `Quét tất cả (${entries.length})`);
+      } else {
+        // ─── Mode 2 & 3: Quét từng entry hoặc theo batch ───
+        const chunkSize = scanMode === 'single' ? 1 : batchSize;
+        const chunks: (typeof entries)[] = [];
+        for (let i = 0; i < entries.length; i += chunkSize) {
+          chunks.push(entries.slice(i, i + chunkSize));
+        }
 
-      const formattedEntries = entries
-        .map(e => `ID: ${e.id}\nComment: ${e.comment}\nKeys: ${e.keys.join(',')}\nContent:\n${e.content}`)
-        .join('\n\n---\n\n');
+        const concurrency = scanMode === 'single' ? parallelCount : parallelCount;
+        const partialResults: (string | null)[] = new Array(chunks.length).fill(null);
+        let completed = 0;
+        setScanProgress({ current: 0, total: chunks.length, results: [] });
 
-      const messages: ChatMessage[] = [
-        { role: 'system', content: MVUZOD_SCHEMA_INFERENCE_PROMPT },
-        { role: 'user', content: `Dưới đây là ${entries.length} entries:\n\n${formattedEntries}\n\nPhân tích và trả về JSON.` },
-      ];
+        // Process chunks with concurrency limit
+        for (let wave = 0; wave < chunks.length; wave += concurrency) {
+          if (cancelRef.current) break;
 
-      let fullText = '';
-      let isTruncated = true;
-      let callCount = 0;
-      let currentMessages = messages;
+          const waveEnd = Math.min(wave + concurrency, chunks.length);
+          const waveIndices = Array.from({ length: waveEnd - wave }, (_, k) => wave + k);
 
-      while (isTruncated && callCount < 4) {
-        callCount++;
-        if (callCount > 1) setLoadingStatus(`Tiếp tục phản hồi (lượt ${callCount})...`);
+          setLoadingStatus(
+            concurrency > 1
+              ? `Song song ${waveIndices.length} batch (${wave + 1}–${waveEnd}/${chunks.length})...`
+              : scanMode === 'single'
+                ? `Entry ${wave + 1}/${chunks.length}: ${chunks[wave][0]?.comment || `ID ${chunks[wave][0]?.id}`}`
+                : `Batch ${wave + 1}/${chunks.length} (${chunks[wave].length} entries)`
+          );
 
-        const response = await callAI({
-          profile: activeProfile,
-          params: { ...params, useJsonResponseFormat: true },
-          messages: currentMessages,
-        });
+          const wavePromises = waveIndices.map(async (idx) => {
+            const chunk = chunks[idx];
+            const label = scanMode === 'single'
+              ? `Entry ${idx + 1}/${chunks.length}: ${chunk[0]?.comment || `ID ${chunk[0]?.id}`}`
+              : `Batch ${idx + 1}/${chunks.length} (${chunk.length} entries)`;
+            return { idx, result: await callAIForEntries(chunk, label) };
+          });
 
-        fullText += response.text;
-        isTruncated = ['MAX_TOKENS', 'max_tokens', 'length'].includes(response.finishReason || '');
+          const settled = await Promise.allSettled(wavePromises);
 
-        if (isTruncated && response.text.trim()) {
-          currentMessages = [
-            ...currentMessages,
-            { role: 'assistant', content: response.text },
-            { role: 'user', content: 'Viết tiếp phần còn thiếu.' },
-          ];
+          for (const outcome of settled) {
+            if (outcome.status === 'fulfilled') {
+              partialResults[outcome.value.idx] = outcome.value.result;
+              completed++;
+            } else {
+              console.error('Batch failed:', outcome.reason);
+              completed++;
+            }
+          }
+
+          setScanProgress({
+            current: completed,
+            total: chunks.length,
+            results: partialResults.filter((r): r is string => r !== null),
+          });
+        }
+
+        // Handle cancel with partial results
+        const validResults = partialResults.filter((r): r is string => r !== null);
+        if (cancelRef.current) {
+          setLoadingStatus('Đã hủy quét.');
+          if (validResults.length > 0) {
+            setLoadingStatus('Tổng hợp kết quả đã quét...');
+            if (validResults.length === 1) {
+              finalText = validResults[0];
+            } else {
+              finalText = await mergeSchemas(validResults);
+            }
+            setLoadingStatus('Phân tích phản hồi...');
+            const parsed = parseSchemaInferenceResponse(finalText!);
+            if (parsed.proposedSchema) {
+              await onApplyInferred(parsed.proposedSchema);
+            }
+          }
+          return;
+        }
+
+        // Merge results if multiple batches
+        if (validResults.length === 1) {
+          finalText = validResults[0];
+        } else if (validResults.length > 1) {
+          finalText = await mergeSchemas(validResults);
         } else {
-          isTruncated = false;
+          throw new Error('Không có kết quả nào từ quét.');
         }
       }
 
       setLoadingStatus('Phân tích phản hồi...');
-      const parsed = parseSchemaInferenceResponse(fullText);
+      const parsed = parseSchemaInferenceResponse(finalText!);
       if (!parsed.proposedSchema) throw new Error('AI không trả về schema hợp lệ.');
 
       await onApplyInferred(parsed.proposedSchema);
@@ -384,14 +553,20 @@ function SchemaSourcePanel({
     } finally {
       setLoading(false);
       setLoadingStatus('');
+      setScanProgress(null);
+      cancelRef.current = false;
     }
-  }, [entries, entryCount, onApplyInferred]);
+  }, [entries, entryCount, onApplyInferred, scanMode, batchSize, parallelCount, callAIForEntries, mergeSchemas]);
 
   const handleStaticAnalyze = useCallback(async () => {
     const report = analyzeLorebookForSchema(entries as LorebookEntry[]);
     const minimal = buildMinimalSchemaFromReport(report);
     await onApplyInferred(minimal);
   }, [entries, onApplyInferred]);
+
+  const handleCancel = useCallback(() => {
+    cancelRef.current = true;
+  }, []);
 
   return (
     <div className="p-4 space-y-5">
@@ -417,7 +592,7 @@ function SchemaSourcePanel({
       </div>
 
       {/* AI Inference */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         <h4 className="text-xs font-semibold flex items-center gap-1.5">
           <Wand2 className="w-3.5 h-3.5 text-primary" /> Phân tích AI
         </h4>
@@ -428,17 +603,113 @@ function SchemaSourcePanel({
           </div>
         )}
 
+        {/* Scan mode selector */}
+        {!loading && (
+          <div className="space-y-2">
+            <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Chế độ quét</p>
+            <div className="grid grid-cols-3 gap-1.5">
+              {([
+                { mode: 'all' as ScanMode, icon: Zap, label: 'Tất cả', desc: `Gửi ${entryCount} entries 1 lần` },
+                { mode: 'single' as ScanMode, icon: ListOrdered, label: 'Từng entry', desc: 'Quét lần lượt từng cái' },
+                { mode: 'batch' as ScanMode, icon: LayoutList, label: 'Theo batch', desc: `Quét mỗi lần N entries` },
+              ]).map(({ mode, icon: Icon, label, desc }) => (
+                <button
+                  key={mode}
+                  onClick={() => setScanMode(mode)}
+                  className={cn(
+                    'flex flex-col items-center gap-1 px-2 py-2.5 rounded-lg border text-center transition-all',
+                    scanMode === mode
+                      ? 'border-primary/50 bg-primary/10 text-primary shadow-sm shadow-primary/10'
+                      : 'border-border bg-background/50 text-muted-foreground hover:border-primary/20 hover:bg-primary/5',
+                  )}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span className="text-[11px] font-medium">{label}</span>
+                  <span className="text-[8px] leading-tight opacity-70">{desc}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Batch size config */}
+            {scanMode === 'batch' && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-primary/20 bg-primary/5">
+                <span className="text-[10px] text-muted-foreground whitespace-nowrap">Số entries / batch:</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={Math.max(1, entryCount)}
+                  value={batchSize}
+                  onChange={e => setBatchSize(Math.max(1, Math.min(entryCount, parseInt(e.target.value) || 1)))}
+                  className="w-14 px-2 py-1 text-xs text-center rounded border border-border bg-background
+                    focus:outline-none focus:ring-1 focus:ring-primary/30"
+                />
+                <span className="text-[9px] text-muted-foreground">
+                  = {Math.ceil(entryCount / batchSize)} batch{Math.ceil(entryCount / batchSize) > 1 ? 'es' : ''}
+                </span>
+              </div>
+            )}
+
+            {/* Parallel concurrency config — shown for batch & single modes */}
+            {(scanMode === 'batch' || scanMode === 'single') && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-violet-500/20 bg-violet-500/5">
+                <span className="text-[10px] text-muted-foreground whitespace-nowrap">Song song:</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={Math.max(1, scanMode === 'batch' ? Math.ceil(entryCount / batchSize) : entryCount)}
+                  value={parallelCount}
+                  onChange={e => {
+                    const maxP = scanMode === 'batch' ? Math.ceil(entryCount / batchSize) : entryCount;
+                    setParallelCount(Math.max(1, Math.min(maxP, parseInt(e.target.value) || 1)));
+                  }}
+                  className="w-14 px-2 py-1 text-xs text-center rounded border border-border bg-background
+                    focus:outline-none focus:ring-1 focus:ring-violet-500/30"
+                />
+                <span className="text-[9px] text-muted-foreground">
+                  {parallelCount === 1 ? 'tuần tự' : `${parallelCount} cùng lúc`}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
         {loading ? (
-          <div className="rounded-lg p-4 border border-primary/20 bg-primary/5 flex flex-col items-center gap-2">
+          <div className="rounded-lg p-4 border border-primary/20 bg-primary/5 flex flex-col items-center gap-3">
             <div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-            <p className="text-[10px] text-muted-foreground animate-pulse">{loadingStatus}</p>
+            <p className="text-[10px] text-muted-foreground animate-pulse text-center">{loadingStatus}</p>
+
+            {/* Progress bar for batch/single mode */}
+            {scanProgress && (
+              <div className="w-full space-y-1.5">
+                <div className="w-full h-2 rounded-full bg-muted/30 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-primary to-primary/70 transition-all duration-500 ease-out"
+                    style={{ width: `${(scanProgress.current / scanProgress.total) * 100}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-[9px] text-muted-foreground">
+                  <span>{scanProgress.current}/{scanProgress.total} {scanMode === 'single' ? 'entries' : 'batches'}</span>
+                  <span>{Math.round((scanProgress.current / scanProgress.total) * 100)}%</span>
+                </div>
+              </div>
+            )}
+
+            {/* Cancel button */}
+            <button
+              onClick={handleCancel}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-destructive/30 bg-destructive/10
+                text-destructive text-[10px] font-medium hover:bg-destructive/20 transition-colors"
+            >
+              <Square className="w-3 h-3" /> Dừng quét
+            </button>
           </div>
         ) : (
           <div className="flex gap-2">
             <button onClick={handleAIAnalyze} disabled={!canAnalyze}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-medium
                 hover:bg-primary/90 disabled:opacity-50 transition-colors">
-              <Scan className="w-3.5 h-3.5" /> AI Inference
+              <Scan className="w-3.5 h-3.5" />
+              {scanMode === 'all' ? 'AI Inference' : scanMode === 'single' ? 'Quét từng entry' : `Quét batch (×${batchSize})`}
             </button>
             <button onClick={handleStaticAnalyze} disabled={!canAnalyze}
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-muted text-muted-foreground text-xs font-medium

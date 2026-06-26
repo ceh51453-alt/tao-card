@@ -16,7 +16,7 @@ import type { CharacterCardV3 } from '../../types/card.types';
 import type { RegexScript, RegexPlacement } from '../../types/regex.types';
 import type { MVUZODSchema } from '../../types/mvuzod.types';
 import { syncMirrorFields } from '../converters/cardDefaults';
-import { exportCardV3 } from '../converters/lorebookConvert';
+import { exportCardV3, exportCardV2Compat } from '../converters/lorebookConvert';
 import { writeCharaToPng, getDefaultCardPng, convertToPngBuffer } from '../converters/pngMetadata';
 import { generateRegexPatterns, type GeneratedRegex } from '../mvuzod/scriptGenerator';
 import { buildMVUImportScript, buildSchemaScript } from '../mvuzod/tavernScriptBuilder';
@@ -258,7 +258,8 @@ export async function packageCard(
   }
 
   if (options.format === 'png' || options.format === 'both') {
-    const jsonStr = exportCardV3(finalCard);
+    const v3Json = exportCardV3(finalCard);
+    const v2Json = exportCardV2Compat(finalCard);
     let pngBuffer: ArrayBuffer;
 
     if (finalCard.avatar && finalCard.avatar.startsWith('data:image/')) {
@@ -267,7 +268,7 @@ export async function packageCard(
       pngBuffer = await getDefaultCardPng(finalCard.data.name);
     }
 
-    const outputBuffer = writeCharaToPng(pngBuffer, jsonStr);
+    const outputBuffer = writeCharaToPng(pngBuffer, v3Json, v2Json);
     pngBlob = new Blob([outputBuffer], { type: 'image/png' });
     totalSize += pngBlob.size;
   }

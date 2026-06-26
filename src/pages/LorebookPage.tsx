@@ -9,7 +9,7 @@ import {
   BookOpen, Plus, Search, Trash2, Copy, GripVertical,
   ChevronDown, ChevronRight, X, Check, Filter,
   ToggleLeft, ToggleRight,
-  Edit3, Layers, Zap, FileText, Globe, Lock, AlertTriangle,
+  Edit3, Layers, Zap, FileText, Globe, Lock, AlertTriangle, Gauge,
 } from 'lucide-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useCardStore } from '../store/cardStore';
@@ -21,6 +21,7 @@ import { RAGDebugPanel } from '../components/lorebook/RAGDebugPanel';
 import { WorldbookHealthPanel } from '../components/lorebook/WorldbookHealthPanel';
 import { LorebookCategorizationPanel } from '../components/lorebook/LorebookCategorizationPanel';
 import { QualityCheckPanel } from '../components/lorebook/QualityCheckPanel';
+import { TokenBudgetWizard } from '../components/tokenBudget/TokenBudgetWizard';
 import {
   ENTRY_CATEGORY_LABELS, getPreset, getStrategyLabel,
   type EntryCategory, type CardType,
@@ -54,7 +55,7 @@ const estimateTokens = (text: string) => Math.ceil((text || '').length / 4);
 // ─── Main Page ──────────────────────────────────────────────────────────────
 
 export function LorebookPage() {
-  const [activeTab, setActiveTab] = useState<'entries' | 'batch' | 'doc' | 'wiki' | 'analysis' | 'quality'>('entries');
+  const [activeTab, setActiveTab] = useState<'entries' | 'batch' | 'doc' | 'wiki' | 'analysis' | 'quality' | 'tctrl'>('entries');
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
@@ -67,6 +68,7 @@ export function LorebookPage() {
           { id: 'wiki' as const, label: 'Cào Wiki', icon: Globe },
           { id: 'analysis' as const, label: 'Phân tích', icon: Filter },
           { id: 'quality' as const, label: 'Chất lượng MN', icon: Lock },
+          { id: 'tctrl' as const, label: 'Sinh EJS điều khiển', icon: Gauge },
         ].map(tab => {
           const Icon = tab.icon;
           return (
@@ -87,6 +89,7 @@ export function LorebookPage() {
       {activeTab === 'wiki' && <div className="flex-1 overflow-y-auto scrollbar-thin"><WikiScraperPanel /></div>}
       {activeTab === 'analysis' && <div className="flex-1 overflow-y-auto scrollbar-thin"><LorebookCategorizationPanel /></div>}
       {activeTab === 'quality' && <div className="flex-1 overflow-y-auto scrollbar-thin p-4"><QualityCheckPanel /></div>}
+      {activeTab === 'tctrl' && <div className="flex-1 overflow-hidden"><TokenBudgetWizard /></div>}
     </div>
   );
 }

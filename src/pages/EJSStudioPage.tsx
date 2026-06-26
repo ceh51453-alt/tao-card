@@ -11,18 +11,20 @@ import { useState, useMemo, useCallback } from 'react';
 import {
   ScrollText, FileCode, Microscope, ChevronDown, Eye,
   PanelLeftClose, PanelRightClose, BookOpen,
-  Sparkles, Code2, Layers, Check,
+  Sparkles, Code2, Layers, Check, Bot, Library,
 } from 'lucide-react';
 import { useCardStore } from '../store/cardStore';
 import { EJSEditor } from '../components/ejs/EJSEditor';
 import { EJSPreviewPanel } from '../components/ejs/EJSPreviewPanel';
 import { EJS_SNIPPETS } from '../components/ejs/ejsSnippets';
 import { JSAnalyzerPanel } from '../components/ejs/JSAnalyzerPanel';
+import { EJSAIGenerator } from '../components/ejs/EJSAIGenerator';
+import { EJSTemplateLibrary } from '../components/ejs/EJSTemplateLibrary';
 import type { MVUZODSchema } from '../types/mvuzod.types';
 import { isPreprocessingEntry } from '../lib/ejs/ejsParser';
 
 type ActiveView = 'ejs' | 'analyzer';
-type RightPanel = 'preview' | 'analysis' | 'reference';
+type RightPanel = 'preview' | 'analysis' | 'reference' | 'ai_generate' | 'library';
 
 const SAMPLE_EJS = `@@preprocessing
 <%_
@@ -322,13 +324,19 @@ export function EJSStudioPage() {
               {([
                 { id: 'preview', label: 'Preview', icon: Eye },
                 { id: 'reference', label: 'Reference', icon: BookOpen },
+                { id: 'ai_generate', label: 'AI Generate', icon: Bot },
+                { id: 'library', label: 'Templates', icon: Library },
               ] as const).map(t => {
                 const Icon = t.icon;
                 return (
                   <button key={t.id}
                     onClick={() => setRightPanel(t.id)}
                     className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-colors ${
-                      rightPanel === t.id ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                      rightPanel === t.id
+                        ? t.id === 'ai_generate'
+                          ? 'bg-emerald-500/10 text-emerald-400 shadow-sm'
+                          : 'bg-background text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
                     }`}>
                     <Icon className="w-3 h-3" /> {t.label}
                   </button>
@@ -343,6 +351,26 @@ export function EJSStudioPage() {
               )}
               {rightPanel === 'reference' && (
                 <BuiltinReference />
+              )}
+              {rightPanel === 'ai_generate' && (
+                <EJSAIGenerator
+                  schema={schema}
+                  currentEditorCode={activeView === 'ejs' ? ejsContent : undefined}
+                  onInsertCode={(code) => {
+                    setEjsContent(code);
+                    setActiveView('ejs');
+                    setIsDirty(true);
+                  }}
+                />
+              )}
+              {rightPanel === 'library' && (
+                <EJSTemplateLibrary
+                  onInsertCode={(code) => {
+                    setEjsContent(code);
+                    setActiveView('ejs');
+                    setIsDirty(true);
+                  }}
+                />
               )}
             </div>
           </div>

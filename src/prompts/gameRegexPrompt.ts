@@ -11,6 +11,8 @@
 
 import type { MVUZODSchema, MVUZODField } from '../types/mvuzod.types';
 import type { RegexScript } from '../types';
+import type { GameUIConfig } from '../types/gameUiConfig.types';
+import { IMAGE_SIZE_PX } from '../lib/mvuzod/gameUiDefaults';
 
 // ─── SYSTEM PROMPT ──────────────────────────────────────────────────────────
 
@@ -117,6 +119,7 @@ export function buildGameRegexUserPrompt(
   schema: MVUZODSchema,
   existingRegexScripts: RegexScript[],
   customInstructions?: string,
+  uiConfig?: GameUIConfig,
 ): string {
   const parts: string[] = [];
 
@@ -139,7 +142,12 @@ Nếu đã có scripts render <StatusPlaceHolderImpl/>, KHÔNG tạo lại.`);
   // 3. Component-specific instructions
   parts.push(getComponentPrompt(component, schema));
 
-  // 4. Custom instructions from user
+  // 4. UI Config (structured settings)
+  if (uiConfig) {
+    parts.push(formatConfigForPrompt(uiConfig));
+  }
+
+  // 5. Custom instructions from user
   if (customInstructions?.trim()) {
     parts.push(`=== YÊU CẦU BỔ SUNG TỪ NGƯỜI DÙNG ===\n${customInstructions.trim()}`);
   }
@@ -304,4 +312,172 @@ function collectLeafFields(fields: MVUZODField[]): MVUZODField[] {
   }
   collect(fields);
   return result;
+}
+
+// ─── CONFIG FORMATTER ───────────────────────────────────────────────────────
+
+function formatConfigForPrompt(config: GameUIConfig): string {
+  const sections: string[] = [];
+  const en = config.enabledSections;
+
+  // Typography
+  if (en.typography) {
+    const t = config.typography;
+    sections.push(`TYPOGRAPHY:
+- Font chính: "${t.fontFamily}", cỡ ${t.fontSize}px, weight: ${t.fontWeight}
+- Font heading: "${t.headingFont}"
+- Line height: ${t.lineHeight}, letter spacing: ${t.letterSpacing}px`);
+  }
+
+  // Text Styling
+  if (en.textStyling) {
+    const ts = config.textStyling;
+    sections.push(`TEXT STYLING:
+- Lời thoại "...": màu ${ts.dialogueColor}, style: ${ts.dialogueStyle}
+- Hành động *...*: màu ${ts.actionColor}, style: ${ts.actionStyle}
+- Tường thuật: màu ${ts.narrativeColor}
+- Dấu ngoặc kép: ${ts.showQuoteMarks ? 'hiện' : 'ẩn'}
+- Highlight tên người nói: ${ts.highlightSpeaker ? 'có' : 'không'}`);
+  }
+
+  // Images
+  if (en.images) {
+    if (config.images.characters.length > 0) {
+      const charLines = config.images.characters.map(img => {
+        const sizePx = img.size === 'custom' ? img.customSizePx : IMAGE_SIZE_PX[img.size as 'small' | 'medium' | 'large'] ?? 64;
+        const features: string[] = [];
+        if (img.zoomable) features.push('zoomable (click phóng to)');
+        if (img.showOnHover) features.push('chỉ hiện khi hover');
+        if (img.border) features.push(`viền ${img.borderColor}`);
+        return `- "${img.characterName}": ${img.imageUrl}
+  Vị trí: ${img.position}, hình: ${img.shape}, ${sizePx}px${features.length ? ', ' + features.join(', ') : ''}
+  Dùng trong: ${img.usedIn.join(', ')}`;
+      }).join('\n');
+      sections.push(`HÌNH ẢNH NHÂN VẬT:\n${charLines}`);
+    }
+    if (config.images.backgroundUrl) {
+      sections.push(`ẢNH NỀN: ${config.images.backgroundUrl}
+- Opacity: ${config.images.backgroundOpacity}, blur: ${config.images.backgroundBlur}px`);
+    }
+  }
+
+  // Layout
+  if (en.layout) {
+    const l = config.layout;
+    sections.push(`LAYOUT:
+- Max-width: ${l.maxWidth}px, border-radius: ${l.borderRadius}px, padding: ${l.padding}px, gap: ${l.gap}px
+- Status bar: vị trí ${l.statusBarPosition}, style ${l.statusBarStyle}
+- Dialogue style: ${l.dialogueBoxStyle}`);
+  }
+
+  // Effects
+  if (en.effects) {
+    const e = config.effects;
+    const effectList: string[] = [];
+    if (e.enableAnimations) effectList.push(`animation: ${e.animationType}`);
+    if (e.enableGlow) effectList.push(`glow: ${e.glowColor} (${e.glowIntensity}px)`);
+    if (e.enableShadow) effectList.push('box-shadow');
+    if (e.enableGradient) effectList.push(`gradient: ${e.gradientFrom} → ${e.gradientTo}`);
+    if (e.enableGlassmorphism) effectList.push('glassmorphism (backdrop-filter: blur)');
+    if (effectList.length > 0) {
+      sections.push(`HIỆU ỨNG:\n${effectList.map(x => `- ${x}`).join('\n')}`);
+    }
+  }
+
+  // Colors
+  if (en.colorScheme) {
+    const c = config.colorScheme;
+    sections.push(`MÀU SẮC (preset: ${c.preset}):
+- Primary: ${c.primaryColor}, Secondary: ${c.secondaryColor}, Accent: ${c.accentColor}
+- Background: ${c.backgroundColor}, Surface: ${c.surfaceColor}, Border: ${c.borderColor}`);
+  }
+
+  // Tabs
+  if (en.tabs && config.tabs.enabled) {
+    const enabledTabs = config.tabs.tabs.filter(t => t.enabled);
+    sections.push(`TAB SYSTEM:
+- Style: ${config.tabs.style}, position: ${config.tabs.position}, size: ${config.tabs.tabSize}
+- ${enabledTabs.length} tabs bật: ${enabledTabs.map(t => `${t.emoji} ${t.label}`).join(', ')}
+- Active color: ${config.tabs.activeColor}, inactive: ${config.tabs.inactiveColor}
+- Show icons: ${config.tabs.showIcons ? 'có' : 'không'}, animated: ${config.tabs.animated ? 'có' : 'không'}`);
+  }
+
+  // Progress Bars
+  if (en.progressBars) {
+    const pb = config.progressBars;
+    sections.push(`PROGRESS BARS:
+- Style: ${pb.style}, height: ${pb.height}px, border-radius: ${pb.borderRadius}px
+- Show label: ${pb.showLabel ? 'có' : 'không'}, show value: ${pb.showValue ? 'có' : 'không'}
+- Animate: ${pb.animateOnChange ? 'có' : 'không'}, striped: ${pb.stripedEffect ? 'có' : 'không'}
+- Màu: HP=${pb.barColors.hp}, MP=${pb.barColors.mp}, EXP=${pb.barColors.exp}, Stamina=${pb.barColors.stamina}, Generic=${pb.barColors.generic}
+- Track: ${pb.trackColor}`);
+  }
+
+  // Buttons
+  if (en.buttons) {
+    const btn = config.buttons;
+    sections.push(`BUTTONS:
+- Shape: ${btn.shape}, variant: ${btn.variant}, size: ${btn.size}
+- Hover: ${btn.hoverEffect}, click: ${btn.clickFeedback}
+- Color: ${btn.primaryColor}, text: ${btn.textColor}, shadow: ${btn.showShadow ? 'có' : 'không'}
+- Icon position: ${btn.iconPosition}`);
+  }
+
+  // NPC Cards
+  if (en.npcCards) {
+    const npc = config.npcCards;
+    sections.push(`NPC / CHARACTER CARDS:
+- Layout: ${npc.layout}, max ${npc.maxCardsPerRow} cards/row
+- Avatar: ${npc.showAvatar ? `${npc.avatarSize}px, ${npc.avatarShape}` : 'ẩn'}
+- Relationship: ${npc.showRelationship ? npc.relationshipStyle : 'ẩn'}
+- Mood: ${npc.showMood ? npc.moodDisplay : 'ẩn'}
+- Title/chức danh: ${npc.showTitle ? 'hiện' : 'ẩn'}
+- Card background: ${npc.cardBackground}`);
+  }
+
+  // Inventory
+  if (en.inventory) {
+    const inv = config.inventory;
+    sections.push(`INVENTORY:
+- Layout: ${inv.layout}${inv.layout === 'grid' ? `, ${inv.gridColumns} cột` : ''}
+- Item card: ${inv.itemCardStyle}
+- Hiện: ${[inv.showQuantity && 'số lượng', inv.showRarity && 'độ hiếm', inv.showCategory && 'danh mục', inv.showItemIcon && 'icon'].filter(Boolean).join(', ')}
+- Empty slots: ${inv.showEmptySlots ? 'hiện' : 'ẩn'}, drag sort: ${inv.enableDragSort ? 'có' : 'không'}
+- Rarity colors: Common=${inv.rarityColors.common}, Uncommon=${inv.rarityColors.uncommon}, Rare=${inv.rarityColors.rare}, Epic=${inv.rarityColors.epic}, Legendary=${inv.rarityColors.legendary}`);
+  }
+
+  // Notifications
+  if (en.notifications && config.notifications.enabled) {
+    const notif = config.notifications;
+    sections.push(`NOTIFICATIONS / TOASTS:
+- Style: ${notif.style}, position: ${notif.position}
+- Duration: ${notif.duration}ms, max visible: ${notif.maxVisible}
+- Accent: ${notif.accentColor}
+- Hiện khi: ${[notif.showForItems && 'nhận vật phẩm', notif.showForStats && 'stat đổi', notif.showForEvents && 'sự kiện'].filter(Boolean).join(', ')}`);
+  }
+
+  // Transitions
+  if (en.transitions) {
+    const tr = config.transitions;
+    sections.push(`TRANSITIONS:
+- Scene: ${tr.sceneTransition}, duration: ${tr.transitionDuration}ms
+- Content reveal: ${tr.contentReveal}
+- Typewriter: ${tr.enableTextTypewriter ? `${tr.typewriterSpeed}ms/char` : 'tắt'}
+- Parallax: ${tr.enableParallax ? 'có' : 'không'}, page flip: ${tr.enablePageFlip ? 'có' : 'không'}`);
+  }
+
+  // Responsive
+  if (en.responsive && config.responsive.enableMobileOptimize) {
+    const r = config.responsive;
+    sections.push(`RESPONSIVE / MOBILE:
+- Breakpoint: ${r.mobileBreakpoint}px, font scale: ×${r.mobileFontScale}
+- Compact mode: ${r.compactModeOnMobile ? 'có' : 'không'}, hide images: ${r.hideImagesOnMobile ? 'có' : 'không'}
+- Stack columns: ${r.stackColumnsOnMobile ? 'có' : 'không'}, touch-friendly: ${r.touchFriendly ? 'có' : 'không'}
+- Swipe gestures: ${r.swipeGestures ? 'có' : 'không'}`);
+  }
+
+  return `=== CẤU HÌNH GIAO DIỆN (từ config panel) ===
+Áp dụng CHÍNH XÁC các giá trị dưới đây vào inline styles của HTML output.
+
+${sections.join('\n\n')}`;
 }

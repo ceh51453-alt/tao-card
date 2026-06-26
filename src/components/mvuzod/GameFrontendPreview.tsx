@@ -25,6 +25,9 @@ import {
   validateGameRegexScripts,
   type ValidationIssue,
 } from '../../lib/mvuzod/gameRegexParser';
+import { GameUIConfigPanel } from './GameUIConfigPanel';
+import type { GameUIConfig } from '../../types/gameUiConfig.types';
+import { DEFAULT_GAME_UI_CONFIG } from '../../lib/mvuzod/gameUiDefaults';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TYPES
@@ -71,6 +74,7 @@ export function GameFrontendPreview({ schema }: GameFrontendPreviewProps) {
   const [selectedComponent, setSelectedComponent] = useState<GameComponent>('status_bar');
   const [customInstructions, setCustomInstructions] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
+  const [uiConfig, setUIConfig] = useState<GameUIConfig>(DEFAULT_GAME_UI_CONFIG);
 
   // Generation state
   const [generating, setGenerating] = useState(false);
@@ -127,6 +131,7 @@ export function GameFrontendPreview({ schema }: GameFrontendPreviewProps) {
         schema,
         existingScripts,
         customInstructions.trim() || undefined,
+        uiConfig,
       );
 
       const messages: ChatMessage[] = [
@@ -220,7 +225,7 @@ export function GameFrontendPreview({ schema }: GameFrontendPreviewProps) {
     } finally {
       setGenerating(false);
     }
-  }, [schema, selectedComponent, existingScripts, customInstructions]);
+  }, [schema, selectedComponent, existingScripts, customInstructions, uiConfig]);
 
   // ─── Apply Handler ───
   const handleApply = useCallback(() => {
@@ -304,6 +309,13 @@ export function GameFrontendPreview({ schema }: GameFrontendPreviewProps) {
         })}
       </div>
 
+      {/* UI Config Panel */}
+      <GameUIConfigPanel
+        config={uiConfig}
+        onChange={setUIConfig}
+        disabled={generating}
+      />
+
       {/* Custom instructions toggle + input */}
       <div className="space-y-2">
         <button
@@ -313,7 +325,7 @@ export function GameFrontendPreview({ schema }: GameFrontendPreviewProps) {
         >
           {showCustomInput ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
           <Sparkles className="w-3 h-3" />
-          Thêm yêu cầu tùy chỉnh (style, animation, theme...)
+          Yêu cầu bổ sung (ghi đè / mô tả thêm cho AI)
         </button>
 
         {showCustomInput && (
@@ -321,7 +333,7 @@ export function GameFrontendPreview({ schema }: GameFrontendPreviewProps) {
             value={customInstructions}
             onChange={e => setCustomInstructions(e.target.value)}
             disabled={generating}
-            placeholder="Ví dụ: Dùng phong cách cyberpunk, thêm hiệu ứng glow neon, tô màu vàng cho lời thoại..."
+            placeholder="Ví dụ: Thêm hiệu ứng đặc biệt cho NPC boss, đổi màu nền khi HP thấp, thêm nhạc nền..."
             className="w-full px-3 py-2.5 text-xs rounded-lg border border-border bg-background
               placeholder:text-muted-foreground/50 resize-none
               focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"

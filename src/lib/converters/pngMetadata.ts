@@ -28,6 +28,7 @@ const crc32 = (buf: Uint8Array): number => {
 
 /**
  * Extracts character JSON string from PNG ArrayBuffer.
+ * Checks for 'ccv3' keyword first (V3 cards), then falls back to 'chara' (V2).
  */
 export function extractCharaFromPng(arrayBuffer: ArrayBuffer): string | null {
   const view = new DataView(arrayBuffer);
@@ -49,6 +50,10 @@ export function extractCharaFromPng(arrayBuffer: ArrayBuffer): string | null {
 
   let offset = 8;
   const textDecoder = new TextDecoder('utf-8');
+
+  // Collect all tEXt chunk data keyed by keyword
+  let ccv3Data: string | null = null;
+  let charaData: string | null = null;
 
   while (offset < uint8.length) {
     if (offset + 8 > uint8.length) break;
@@ -72,15 +77,16 @@ export function extractCharaFromPng(arrayBuffer: ArrayBuffer): string | null {
 
       if (nullIndex !== -1) {
         const keyword = textDecoder.decode(chunkData.subarray(0, nullIndex));
-        if (keyword === 'chara') {
-          const base64Text = textDecoder.decode(chunkData.subarray(nullIndex + 1));
+        const base64Text = textDecoder.decode(chunkData.subarray(nullIndex + 1));
+
+        if (keyword === 'ccv3' && !ccv3Data) {
           try {
-            // base64 decode
-            const jsonStr = decodeBase64(base64Text);
-            return jsonStr;
-          } catch (e) {
-            throw new Error('Không thể giải mã dữ liệu chara base64 từ tEXt chunk.', { cause: e });
-          }
+            ccv3Data = decodeBase64(base64Text);
+          } catch { /* ignore decode error, try next */ }
+        } else if (keyword === 'chara' && !charaData) {
+          try {
+            charaData = decodeBase64(base64Text);
+          } catch { /* ignore decode error, try next */ }
         }
       }
     }
@@ -89,17 +95,121 @@ export function extractCharaFromPng(arrayBuffer: ArrayBuffer): string | null {
     offset += 12 + length;
   }
 
-  return null;
+  // Prefer V3 (ccv3) over V2 (chara)
+  return ccv3Data ?? charaData ?? null;
 }
 
 /**
- * Embeds character JSON string into PNG ArrayBuffer.
+ * Build a PNG tEXt chunk with the given keyword and text data.
  */
-export function writeCharaToPng(pngArrayBuffer: ArrayBuffer, charDataJson: string): ArrayBuffer {
-  const uint8 = new Uint8Array(pngArrayBuffer);
-  const view = new DataView(pngArrayBuffer);
+function buildTextChunk(keyword: string, textData: string): Uint8Array {
+  const textEncoder = new TextEncoder();
+  const keywordBytes = textEncoder.encode(keyword);
+  const textBytes = textEncoder.encode(textData);
 
-  // Check signature
+  const chunkDataLength = keywordBytes.length + 1 + textBytes.length;
+  const chunk = new Uint8Array(12 + chunkDataLength);
+  const chunkView = new DataView(chunk.buffer);
+
+  // Length (4 bytes)
+  chunkView.setUint32(0, chunkDataLength);
+
+  // Type 'tEXt' (4 bytes)
+  chunk[4] = 116; // 't'
+  chunk[5] = 69;  // 'E'
+  chunk[6] = 120; // 'x'
+  chunk[7] = 116; // 't'
+
+  // Data: keyword + null separator + text
+  chunk.set(keywordBytes, 8);
+  chunk[8 + keywordBytes.length] = 0;
+  chunk.set(textBytes, 8 + keywordBytes.length + 1);
+
+  // CRC (type + data)
+  const crcInput = chunk.subarray(4, 8 + chunkDataLength);
+  chunkView.setUint32(8 + chunkDataLength, crc32(crcInput));
+
+  return chunk;
+}
+
+/**
+ * Strip all tEXt chunks whose keyword matches any in the given set.
+ * Returns a new Uint8Array without those chunks.
+ */
+function stripTextChunks(uint8: Uint8Array, keywords: Set<string>): Uint8Array {
+  const textDecoder = new TextDecoder('utf-8');
+  const pieces: Uint8Array[] = [];
+
+  // PNG signature (8 bytes) is always kept
+  pieces.push(uint8.subarray(0, 8));
+
+  let offset = 8;
+  const view = new DataView(uint8.buffer, uint8.byteOffset, uint8.byteLength);
+
+  while (offset < uint8.length) {
+    if (offset + 8 > uint8.length) break;
+
+    const length = view.getUint32(offset);
+    const type = textDecoder.decode(uint8.subarray(offset + 4, offset + 8));
+    const totalChunkSize = 12 + length; // length(4) + type(4) + data(length) + crc(4)
+
+    if (type === 'tEXt') {
+      // Parse keyword from chunk data
+      const dataStart = offset + 8;
+      const dataEnd = dataStart + length;
+      const chunkData = uint8.subarray(dataStart, dataEnd);
+      let nullIdx = -1;
+      for (let i = 0; i < chunkData.length; i++) {
+        if (chunkData[i] === 0) { nullIdx = i; break; }
+      }
+      const keyword = nullIdx >= 0
+        ? textDecoder.decode(chunkData.subarray(0, nullIdx))
+        : textDecoder.decode(chunkData);
+
+      if (keywords.has(keyword)) {
+        // Skip this chunk (don't add to pieces)
+        offset += totalChunkSize;
+        continue;
+      }
+    }
+
+    pieces.push(uint8.subarray(offset, offset + totalChunkSize));
+    offset += totalChunkSize;
+  }
+
+  // Concatenate pieces
+  const totalLen = pieces.reduce((sum, p) => sum + p.length, 0);
+  const result = new Uint8Array(totalLen);
+  let pos = 0;
+  for (const piece of pieces) {
+    result.set(piece, pos);
+    pos += piece.length;
+  }
+  return result;
+}
+
+/**
+ * Embeds character JSON into PNG ArrayBuffer.
+ *
+ * Writes two tEXt chunks for compatibility:
+ *   - 'ccv3' — V3 card JSON (primary, SillyTavern reads this first)
+ *   - 'chara' — same JSON for V2 backward compatibility
+ *
+ * Any existing 'chara'/'ccv3' tEXt chunks are stripped first
+ * to prevent stale/duplicate data.
+ *
+ * @param v3Json - The V3 card JSON string (used for 'ccv3' chunk)
+ * @param v2Json - Optional V2-compatible JSON for the 'chara' chunk.
+ *                 If omitted, v3Json is used for both chunks.
+ */
+export function writeCharaToPng(
+  pngArrayBuffer: ArrayBuffer,
+  v3Json: string,
+  v2Json?: string,
+): ArrayBuffer {
+  let uint8 = new Uint8Array(pngArrayBuffer);
+
+  // Validate PNG signature
   if (
     uint8[0] !== 0x89 ||
     uint8[1] !== 0x50 ||
@@ -113,45 +223,29 @@ export function writeCharaToPng(pngArrayBuffer: ArrayBuffer, charDataJson: strin
     throw new Error('File nguồn không phải định dạng ảnh PNG hợp lệ.');
   }
 
-  const base64Data = encodeBase64(charDataJson);
-  const textEncoder = new TextEncoder();
-  const keywordBytes = textEncoder.encode('chara');
-  const textBytes = textEncoder.encode(base64Data);
+  // Step 1: Strip any existing chara/ccv3 chunks
+  uint8 = stripTextChunks(uint8, new Set(['chara', 'ccv3']));
 
-  // tEXt chunk data: keyword (5 bytes) + null separator (1 byte) + textBytes
-  const chunkDataLength = keywordBytes.length + 1 + textBytes.length;
-  const newChunk = new Uint8Array(12 + chunkDataLength);
+  // Step 2: Build new chunks
+  const ccv3Chunk = buildTextChunk('ccv3', encodeBase64(v3Json));
+  const charaChunk = buildTextChunk('chara', encodeBase64(v2Json ?? v3Json));
 
-  // Write Length (4 bytes)
-  const chunkView = new DataView(newChunk.buffer);
-  chunkView.setUint32(0, chunkDataLength);
-
-  // Write Type 'tEXt' (4 bytes)
-  newChunk[4] = 116; // 't'
-  newChunk[5] = 69;  // 'E'
-  newChunk[6] = 120; // 'x'
-  newChunk[7] = 116; // 't'
-
-  // Write Data (keyword + null + text)
-  newChunk.set(keywordBytes, 8);
-  newChunk[8 + keywordBytes.length] = 0; // null separator
-  newChunk.set(textBytes, 8 + keywordBytes.length + 1);
-
-  // Calculate CRC (type + data bytes)
-  const crcInput = newChunk.subarray(4, 8 + chunkDataLength);
-  const crcVal = crc32(crcInput);
-  chunkView.setUint32(8 + chunkDataLength, crcVal);
-
-  // We insert this new 'tEXt' chunk right after 'IHDR' chunk (first chunk)
-  // Let's locate the first chunk length
+  // Step 3: Find insert point — right after IHDR chunk
+  const view = new DataView(uint8.buffer, uint8.byteOffset, uint8.byteLength);
   const firstChunkLength = view.getUint32(8);
-  const insertOffset = 8 + 12 + firstChunkLength; // after signature (8) + length(4) + type(4) + data(firstChunkLength) + crc(4)
+  const insertOffset = 8 + 12 + firstChunkLength;
 
-  // Allocate new array buffer
-  const outBuffer = new Uint8Array(uint8.length + newChunk.length);
+  // Step 4: Assemble output: [signature + IHDR] + [ccv3] + [chara] + [rest]
+  const outBuffer = new Uint8Array(
+    uint8.length + ccv3Chunk.length + charaChunk.length,
+  );
   outBuffer.set(uint8.subarray(0, insertOffset), 0);
-  outBuffer.set(newChunk, insertOffset);
-  outBuffer.set(uint8.subarray(insertOffset), insertOffset + newChunk.length);
+  outBuffer.set(ccv3Chunk, insertOffset);
+  outBuffer.set(charaChunk, insertOffset + ccv3Chunk.length);
+  outBuffer.set(
+    uint8.subarray(insertOffset),
+    insertOffset + ccv3Chunk.length + charaChunk.length,
+  );
 
   return outBuffer.buffer;
 }

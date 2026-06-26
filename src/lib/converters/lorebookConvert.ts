@@ -91,6 +91,41 @@ export function exportCardV3(card: CharacterCardV3): string {
   return JSON.stringify(synced, null, 2);
 }
 
+/**
+ * Export V2-compatible card JSON for the 'chara' PNG tEXt chunk.
+ *
+ * SillyTavern reads 'chara' as V2 format. The key difference is that
+ * character_book.entries is a Record<string, {...}> (object with string keys)
+ * instead of an Array, and field names use SillyTavern's internal conventions
+ * (uid, key, keysecondary, order, disable, etc.).
+ */
+export function exportCardV2Compat(card: CharacterCardV3): string {
+  const synced = syncMirrorFields(structuredClone(card));
+
+  // Convert character_book entries to SillyTavern V2 format
+  const entries = synced.data.character_book?.entries ?? [];
+  const v2Entries: Record<string, Record<string, unknown>> = {};
+  entries.forEach((entry, index) => {
+    v2Entries[String(index)] = entryToStandalone(entry);
+  });
+
+  // Build V2-compatible card object
+  const v2Card = {
+    ...synced,
+    data: {
+      ...synced.data,
+      character_book: synced.data.character_book
+        ? {
+            ...synced.data.character_book,
+            entries: v2Entries,
+          }
+        : undefined,
+    },
+  };
+
+  return JSON.stringify(v2Card, null, 2);
+}
+
 /** Export standalone lorebook file (spec 3.6) */
 export function exportStandaloneLorebook(card: CharacterCardV3): string {
   const entries = card.data.character_book?.entries ?? [];
