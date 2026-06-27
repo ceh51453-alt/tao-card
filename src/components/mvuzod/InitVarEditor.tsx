@@ -7,7 +7,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import {
   Plus, Trash2, Copy, Star, StarOff, ChevronDown, ChevronRight,
-  FileText, Check, X, Download, Layers, Wand2, Loader2,
+  FileText, Check, X, Download, Layers, Wand2, Loader2, Save,
 } from 'lucide-react';
 import type { MVUZODSchema, MVUZODField, InitVarEntry, InitVarConfig } from '../../types/mvuzod.types';
 import { v4 as uuid } from 'uuid';
@@ -402,11 +402,36 @@ function PerOpeningPreview({ entries }: { entries: InitVarEntry[] }) {
 // ─── Main Component ─────────────────────────────────────────────────────
 
 export function InitVarEditor({ schema }: { schema: MVUZODSchema | null }) {
-  const [config, setConfig] = useState<InitVarConfig>({
-    entries: [],
-    activeEntryId: null,
-    initvarMode: 'worldbook',
+  const savedConfig = useCardStore(s => s.getMvuzodInitVar());
+  const setMvuzodInitVar = useCardStore(s => s.setMvuzodInitVar);
+
+  // Local state initialized from store (or empty)
+  const [config, setConfigLocal] = useState<InitVarConfig>(() => {
+    if (savedConfig) return structuredClone(savedConfig);
+    return {
+      entries: [],
+      activeEntryId: null,
+      initvarMode: 'worldbook',
+    };
   });
+
+  // Track if local state differs from saved
+  const hasUnsaved = useMemo(() => {
+    return JSON.stringify(config) !== JSON.stringify(savedConfig);
+  }, [config, savedConfig]);
+
+  // Save to card store
+  const handleSaveToCard = useCallback(() => {
+    setMvuzodInitVar(config);
+  }, [config, setMvuzodInitVar]);
+
+  // Wrapper that updates local state
+  const setConfig = useCallback((updater: InitVarConfig | ((prev: InitVarConfig) => InitVarConfig)) => {
+    setConfigLocal(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      return next;
+    });
+  }, []);
 
   const handleAddEntry = useCallback(() => {
     if (!schema) return;
@@ -423,7 +448,7 @@ export function InitVarEditor({ schema }: { schema: MVUZODSchema | null }) {
       entries: [...prev.entries, newEntry],
       activeEntryId: id,
     }));
-  }, [schema, config.entries.length]);
+  }, [schema, config.entries.length, setConfig]);
 
   const handleDuplicate = useCallback((sourceId: string) => {
     const source = config.entries.find(e => e.id === sourceId);
@@ -439,14 +464,14 @@ export function InitVarEditor({ schema }: { schema: MVUZODSchema | null }) {
       ...prev,
       entries: [...prev.entries, newEntry],
     }));
-  }, [config.entries]);
+  }, [config.entries, setConfig]);
 
   const handleUpdate = useCallback((id: string, patch: Partial<InitVarEntry>) => {
     setConfig(prev => ({
       ...prev,
       entries: prev.entries.map(e => e.id === id ? { ...e, ...patch } : e),
     }));
-  }, []);
+  }, [setConfig]);
 
   const handleDelete = useCallback((id: string) => {
     setConfig(prev => {
@@ -460,14 +485,14 @@ export function InitVarEditor({ schema }: { schema: MVUZODSchema | null }) {
         activeEntryId: prev.activeEntryId === id ? (filtered[0]?.id ?? null) : prev.activeEntryId,
       };
     });
-  }, []);
+  }, [setConfig]);
 
   const handleSetDefault = useCallback((id: string) => {
     setConfig(prev => ({
       ...prev,
       entries: prev.entries.map(e => ({ ...e, isDefault: e.id === id })),
     }));
-  }, []);
+  }, [setConfig]);
 
   // ─── Generate Worldbook YAML preview ──────────────────────────────
 
@@ -571,6 +596,37 @@ export function InitVarEditor({ schema }: { schema: MVUZODSchema | null }) {
         }} />
       </div>
 
+      {/* ─── Save to Card Button ─────────────────────────────────────── */}
+      {config.entries.length > 0 && (
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleSaveToCard}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+              hasUnsaved
+                ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98]'
+                : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 cursor-default'
+            }`}
+          >
+            {hasUnsaved ? (
+              <>
+                <Save className="w-4 h-4" />
+                💾 Lưu vào Card
+              </>
+            ) : (
+              <>
+                <Check className="w-4 h-4" />
+                ✅ Đã lưu
+              </>
+            )}
+          </button>
+          {hasUnsaved && (
+            <span className="text-[10px] text-amber-400/80 animate-pulse">
+              ⚠️ Có thay đổi chưa lưu — nhấn để lưu vào card
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Preview — depends on mode */}
       {config.entries.length > 0 && config.initvarMode === 'worldbook' && (
         <div className="rounded-xl border border-border bg-card p-4 space-y-2">
@@ -619,7 +675,7 @@ function AIInitVarButton({
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const entries = useCardStore(s => s.card.data.character_book?.entries ?? []);
+  const card = useCardStore(s => s.card);
 
   const handleGenerate = useCallback(async () => {
     setLoading(true);
@@ -630,13 +686,40 @@ function AIInitVarButton({
       if (!activeProfile?.apiKey) throw new Error('Chưa cấu hình API AI.');
 
       const schemaDesc = JSON.stringify(schema, null, 2);
-      const sampleEntries = entries.slice(0, 30).map(e =>
-        `Comment: ${e.comment}\nKeys: ${(e as { keys: string[] }).keys.join(',')}\nContent:\n${e.content.slice(0, 500)}`
+
+      // ── Collect full card context ──
+      const cardContext: string[] = [];
+      if (card.data.name) cardContext.push(`CHARACTER NAME: ${card.data.name}`);
+      if (card.data.description) cardContext.push(`DESCRIPTION:\n${card.data.description.slice(0, 2000)}`);
+      if (card.data.personality) cardContext.push(`PERSONALITY:\n${card.data.personality.slice(0, 1000)}`);
+      if (card.data.scenario) cardContext.push(`SCENARIO:\n${card.data.scenario.slice(0, 1500)}`);
+      if (card.data.first_mes) cardContext.push(`FIRST MESSAGE (Opening):\n${card.data.first_mes.slice(0, 2000)}`);
+      if (card.data.alternate_greetings?.length) {
+        const altGreetings = card.data.alternate_greetings
+          .map((g, i) => `--- Opening ${i + 2} ---\n${g.slice(0, 1000)}`)
+          .join('\n');
+        cardContext.push(`ALTERNATE OPENINGS:\n${altGreetings}`);
+      }
+
+      // ── Collect lorebook entries (more entries, more content) ──
+      const entries = card.data.character_book?.entries ?? [];
+      const sampleEntries = entries.slice(0, 50).map(e =>
+        `Comment: ${e.comment}\nKeys: ${(e as { keys: string[] }).keys.join(',')}\nContent:\n${e.content.slice(0, 800)}`
       ).join('\n---\n');
+
+      const userMessage = [
+        `SCHEMA:\n${schemaDesc}`,
+        '',
+        `=== CARD CONTEXT (ĐỌC KỸ ĐỂ SUY LUẬN) ===\n${cardContext.join('\n\n')}`,
+        '',
+        `=== LOREBOOK (${entries.length} entries, mẫu ${Math.min(50, entries.length)}) ===\n${sampleEntries}`,
+        '',
+        `Hãy phân tích toàn bộ bối cảnh card + lorebook ở trên, rồi tạo giá trị khởi tạo CỤ THỂ và PHÙ HỢP nhất cho schema này. Đặc biệt chú ý opening message để biết cảnh bắt đầu ở đâu, nhân vật đang làm gì, ai có mặt.`,
+      ].join('\n');
 
       const messages: ChatMessage[] = [
         { role: 'system', content: MVUZOD_INITVAR_PROMPT },
-        { role: 'user', content: `SCHEMA:\n${schemaDesc}\n\nLOREBOOK (${entries.length} entries, mẫu ${Math.min(30, entries.length)}):\n${sampleEntries}\n\nHãy tạo giá trị khởi tạo phù hợp.` },
+        { role: 'user', content: userMessage },
       ];
 
       const response = await callAI({
@@ -654,7 +737,7 @@ function AIInitVarButton({
     } finally {
       setLoading(false);
     }
-  }, [schema, entries, onGenerated]);
+  }, [schema, card, onGenerated]);
 
   return (
     <div className="flex flex-col gap-1">

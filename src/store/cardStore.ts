@@ -7,7 +7,7 @@
 import { create } from 'zustand';
 import type { StateCreator } from 'zustand';
 import type { CharacterCardV3, LorebookEntry, CardExtensions } from '../types';
-import type { MVUZODSchema } from '../types/mvuzod.types';
+import type { MVUZODSchema, InitVarConfig } from '../types/mvuzod.types';
 import { tavernSync } from '../lib/sync/tavernSyncService';
 import { createEmptyCard, syncMirrorFields, nextEntryId } from '../lib/converters/cardDefaults';
 import * as repo from '../lib/db/projectRepo';
@@ -39,6 +39,8 @@ export interface CardSlice {
   reorderEntries: (newOrder: number[]) => void;
   getNextEntryId: () => number;
   setMvuzodSchema: (schema: MVUZODSchema | null) => void;
+  setMvuzodInitVar: (config: InitVarConfig | null) => void;
+  getMvuzodInitVar: () => InitVarConfig | null;
 }
 
 export interface PersistenceSlice {
@@ -234,6 +236,31 @@ const createCardSlice: StateCreator<CardState, [], [], CardSlice> = (set, get) =
       return { card, isDirty: true };
     });
     get()._scheduleAutoSave();
+  },
+
+  setMvuzodInitVar: (config) => {
+    set(s => {
+      const card = structuredClone(s.card);
+      const ext = (card.data.extensions ?? {}) as Record<string, unknown>;
+      if (config) {
+        ext.mvuzod = { ...(ext.mvuzod as Record<string, unknown> ?? {}), initVarConfig: config };
+      } else {
+        if (ext.mvuzod) {
+          delete (ext.mvuzod as Record<string, unknown>).initVarConfig;
+        }
+      }
+      card.data.extensions = ext as unknown as CardExtensions;
+      return { card, isDirty: true };
+    });
+    get()._scheduleAutoSave();
+  },
+
+  getMvuzodInitVar: () => {
+    const ext = get().card.data.extensions as unknown as Record<string, unknown>;
+    if (ext?.mvuzod) {
+      return (ext.mvuzod as Record<string, unknown>).initVarConfig as InitVarConfig ?? null;
+    }
+    return null;
   },
 });
 

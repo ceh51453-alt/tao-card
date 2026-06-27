@@ -3,13 +3,15 @@
  * Spec Phần 9.5: runCopilotLoop, handleAction, applyAction
  */
 
-import type { ChatMessage, CharacterCardV3, ProxyProfile, GenerationParams, LorebookEntry } from '../../types';
+import type { ChatMessage, CharacterCardV3, ProxyProfile, GenerationParams, LorebookEntry, TavernHelperScript, AIGeneratedEntry } from '../../types';
 import type { AIAction, AIResponse, WorldbuildingMode, CopilotMessage } from './copilotTypes';
 import { callAI } from './client';
 import { buildCopilotSystemPrompt } from './copilotPrompts';
 import { parseAIResponseJSON } from './jsonExtract';
 import { materializeEntry, nextEntryId } from '../converters/cardDefaults';
 import { toolsEngine } from '../toolsEngine';
+import { v4 as uuidv4 } from 'uuid';
+
 
 // Completeness Protocol
 const CRITICAL_ABSOLUTE_COMPLETENESS_PROTOCOL = `
@@ -238,8 +240,27 @@ async function handleAction(
 // APPLY ACTION TO CARD
 // ═══════════════════════════════════════════════════════════════════════════
 
+interface GenericAction {
+  type: string;
+  data?: {
+    comment?: string;
+    keys?: string[];
+    content?: string;
+    id?: string | number;
+    patch?: Record<string, unknown>;
+    name?: string;
+    code?: string;
+    key?: string;
+    value?: unknown;
+    path?: string;
+    [key: string]: unknown;
+  };
+  id?: string | number;
+  patch?: Record<string, unknown>;
+}
+
 export function executeAction(
-  action: AIAction,
+  rawAction: AIAction,
   card: CharacterCardV3,
   addEntry: (entry: LorebookEntry) => void,
   updateEntry: (id: number, patch: Partial<LorebookEntry>) => void,
@@ -247,6 +268,7 @@ export function executeAction(
   updateField: (path: string, value: unknown) => void,
   safeMode: boolean = false
 ): void {
+  const action = rawAction as unknown as GenericAction;
   if (!card.data.character_book) {
     card.data.character_book = { name: card.data.name, entries: [] };
   }
@@ -260,9 +282,9 @@ export function executeAction(
   switch (action.type) {
     case 'create_entry': {
       // Duplicate check
-      const newComment = (action.data.comment || '').trim().toLowerCase();
+      const newComment = (action.data?.comment || '').trim().toLowerCase();
       if (existingComments.has(newComment)) {
-        console.warn(`[SafeMode] Bỏ qua tạo entry trùng lặp: ${action.data.comment}`);
+        console.warn(`[SafeMode] Bỏ qua tạo entry trùng lặp: ${action.data?.comment}`);
         break;
       }
 
@@ -273,31 +295,118 @@ export function executeAction(
         prevent_recursion: true,
         exclude_recursion: true
       };
-      const entry = materializeEntry(patch, {}, id);
+      const entry = materializeEntry(patch as unknown as AIGeneratedEntry, {}, id);
       addEntry(entry);
       entries.push(entry);
       break;
     }
     case 'update_entry': {
       if (safeMode) {
-        console.warn(`[SafeMode] Từ chối update entry ${action.data.id}`);
+        console.warn(`[SafeMode] Từ chối update entry ${action.data?.id}`);
         break;
       }
-      updateEntry(action.data.id, action.data.patch as Partial<LorebookEntry>);
+      if (action.data?.id !== undefined) {
+        updateEntry(Number(action.data.id), action.data.patch as Partial<LorebookEntry>);
+      }
       break;
     }
     case 'delete_entry': {
       if (safeMode) {
-        console.warn(`[SafeMode] Từ chối delete entry ${action.data.id}`);
+        console.warn(`[SafeMode] Từ chối delete entry ${action.data?.id}`);
         break;
       }
-      deleteEntry(action.data.id);
+      if (action.data?.id !== undefined) {
+        deleteEntry(Number(action.data.id));
+      }
       break;
     }
     case 'update_field': {
-      updateField(action.data.path, action.data.value);
+      if (action.data?.path) {
+        updateField(action.data.path, action.data.value);
+      }
       break;
     }
-    // Other action types handled by specific modules
+    case 'add_regex':
+    case 'add_regex_script': {
+      if (!card.data.extensions) {
+        card.data.extensions = {} as unknown as CharacterCardV3['data']['extensions'];
+      }
+      if (!card.data.extensions.regex_scripts) {
+        card.data.extensions.regex_scripts = [];
+      }
+      const rawData = action.data;
+      const newScript = {
+        id: uuidv4(),
+        ...rawData,
+      };
+      card.data.extensions.regex_scripts.push(newScript as unknown as CharacterCardV3['data']['extensions']['regex_scripts'][number]);
+      updateField('data.extensions.regex_scripts', card.data.extensions.regex_scripts);
+      break;
+    }
+    case 'update_regex':
+    case 'update_regex_script': {
+      const data = action.data;
+      const id = action.type === 'update_regex' ? action.id : data?.id;
+      const patch = action.type === 'update_regex' ? action.patch : data?.patch;
+      if (card.data.extensions?.regex_scripts && id) {
+        card.data.extensions.regex_scripts = card.data.extensions.regex_scripts.map(s =>
+          s.id === id ? { ...s, ...patch } : s
+        );
+        updateField('data.extensions.regex_scripts', card.data.extensions.regex_scripts);
+      }
+      break;
+    }
+    case 'delete_regex':
+    case 'delete_regex_script': {
+      const data = action.data;
+      const id = action.type === 'delete_regex' ? action.id : data?.id;
+      if (card.data.extensions?.regex_scripts && id) {
+        card.data.extensions.regex_scripts = card.data.extensions.regex_scripts.filter(s => s.id !== id);
+        updateField('data.extensions.regex_scripts', card.data.extensions.regex_scripts);
+      }
+      break;
+    }
+    case 'create_tavern_script': {
+      if (!card.data.extensions) {
+        card.data.extensions = {} as unknown as CharacterCardV3['data']['extensions'];
+      }
+      if (!card.data.extensions.tavern_helper) {
+        card.data.extensions.tavern_helper = { scripts: [], variables: {} };
+      }
+      if (!card.data.extensions.tavern_helper.scripts) {
+        card.data.extensions.tavern_helper.scripts = [];
+      }
+      const rawData = action.data;
+      const newScript: TavernHelperScript = {
+        type: 'script',
+        enabled: true,
+        id: uuidv4(),
+        name: rawData?.name || 'Script',
+        content: rawData?.code || '',
+        info: 'Sinh bởi AI Copilot',
+        button: { enabled: false, buttons: [] },
+        data: {},
+      };
+      card.data.extensions.tavern_helper.scripts.push(newScript);
+      updateField('data.extensions.tavern_helper.scripts', card.data.extensions.tavern_helper.scripts);
+      break;
+    }
+    case 'set_variable': {
+      if (!card.data.extensions) {
+        card.data.extensions = {} as unknown as CharacterCardV3['data']['extensions'];
+      }
+      if (!card.data.extensions.tavern_helper) {
+        card.data.extensions.tavern_helper = { scripts: [], variables: {} };
+      }
+      if (!card.data.extensions.tavern_helper.variables) {
+        card.data.extensions.tavern_helper.variables = {};
+      }
+      const rawData = action.data;
+      if (rawData?.key) {
+        card.data.extensions.tavern_helper.variables[rawData.key] = rawData.value;
+        updateField('data.extensions.tavern_helper.variables', card.data.extensions.tavern_helper.variables);
+      }
+      break;
+    }
   }
 }

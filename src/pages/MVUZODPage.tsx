@@ -114,24 +114,52 @@ export function MVUZODPage() {
       {/* Divider */}
       <div className="h-px bg-border shrink-0" />
 
-      {/* Content */}
-      {tab === 'wizard' ? (
-        <div className="flex-1 overflow-hidden">
-          <SchemaBuilder />
+      {/* Content — all tabs stay mounted, only visibility toggles via CSS */}
+      <div className="flex-1 overflow-hidden" style={{ display: tab === 'wizard' ? 'flex' : 'none' }}>
+        <SchemaBuilder />
+      </div>
+
+      <div className="flex-1 overflow-y-auto scrollbar-thin" style={{ display: tab === 'initvar' ? undefined : 'none' }}>
+        <div className="max-w-5xl mx-auto px-6 py-5">
+          <InitVarEditor schema={existingSchema} />
         </div>
-      ) : (
-        <div className="flex-1 overflow-y-auto scrollbar-thin">
-          <div className="max-w-5xl mx-auto px-6 py-5">
-            {tab === 'initvar' && <InitVarEditor schema={existingSchema} />}
-            {tab === 'varlist' && <VariableListGenerator schema={existingSchema} />}
-            {tab === 'update' && <UpdateRulesEditor schema={existingSchema} />}
-            {tab === 'patch' && <PatchPreview schema={existingSchema} />}
-            {tab === 'script' && <ScriptOutput schema={existingSchema} />}
-            {tab === 'game' && <GameFrontendPreview schema={existingSchema} />}
-            {tab === 'playground' && <VariablePlayground schema={existingSchema} />}
-          </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto scrollbar-thin" style={{ display: tab === 'varlist' ? undefined : 'none' }}>
+        <div className="max-w-5xl mx-auto px-6 py-5">
+          <VariableListGenerator schema={existingSchema} />
         </div>
-      )}
+      </div>
+
+      <div className="flex-1 overflow-y-auto scrollbar-thin" style={{ display: tab === 'update' ? undefined : 'none' }}>
+        <div className="max-w-5xl mx-auto px-6 py-5">
+          <UpdateRulesEditor schema={existingSchema} />
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto scrollbar-thin" style={{ display: tab === 'patch' ? undefined : 'none' }}>
+        <div className="max-w-5xl mx-auto px-6 py-5">
+          <PatchPreview schema={existingSchema} />
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto scrollbar-thin" style={{ display: tab === 'script' ? undefined : 'none' }}>
+        <div className="max-w-5xl mx-auto px-6 py-5">
+          <ScriptOutput schema={existingSchema} />
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto scrollbar-thin" style={{ display: tab === 'game' ? undefined : 'none' }}>
+        <div className="max-w-5xl mx-auto px-6 py-5">
+          <GameFrontendPreview schema={existingSchema} />
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto scrollbar-thin" style={{ display: tab === 'playground' ? undefined : 'none' }}>
+        <div className="max-w-5xl mx-auto px-6 py-5">
+          <VariablePlayground schema={existingSchema} />
+        </div>
+      </div>
     </div>
   );
 }

@@ -8,9 +8,14 @@ import { useState, useCallback, useEffect } from 'react';
 import {
   ListTree, Copy, FileCode, Zap,
   ChevronDown, ChevronRight, Check, Settings2,
+  Wand2, Loader2,
 } from 'lucide-react';
 import type { MVUZODSchema, MVUZODField, GeneratedVariableEntry } from '../../types/mvuzod.types';
+import type { ChatMessage } from '../../types';
 import { useCardStore } from '../../store/cardStore';
+import { useSettingsStore } from '../../store/settingsStore';
+import { callAI } from '../../lib/ai/client';
+import { MVUZOD_VARLIST_PROMPT, MVUZOD_SIMPLE_UPDATE_RULES_PROMPT } from '../../prompts/modeMVUZOD';
 
 // ─── Template Presets ────────────────────────────────────────────────────
 
@@ -156,6 +161,8 @@ export function VariableListGenerator({ schema }: { schema: MVUZODSchema | null 
     updateRules: null,
   });
   const [addedToCard, setAddedToCard] = useState<Set<string>>(new Set());
+  const [isGeneratingVarList, setIsGeneratingVarList] = useState(false);
+  const [isGeneratingRules, setIsGeneratingRules] = useState(false);
 
   // Initialize visible paths from schema
   useEffect(() => {
@@ -171,12 +178,67 @@ export function VariableListGenerator({ schema }: { schema: MVUZODSchema | null 
     setVisiblePaths(allPaths);
   }, [schema]);
 
-  const handleGenerate = useCallback(() => {
+  const handleGenerateVarListAI = useCallback(async () => {
     if (!schema) return;
-    const varList = generateVariableListEntry(schema, visiblePaths, selectedPreset, card.data.name || 'Character');
-    const updateRules = generateUpdateRulesEntry(schema, card.data.name || 'Character');
-    setGenerated({ varList, updateRules });
-  }, [schema, visiblePaths, selectedPreset, card.data.name]);
+    setIsGeneratingVarList(true);
+    try {
+      const activeProfile = useSettingsStore.getState().getActiveProfile();
+      const params = useSettingsStore.getState().generationParams;
+      if (!activeProfile?.apiKey) throw new Error('Chưa cấu hình API AI.');
+
+      const baseVarList = generateVariableListEntry(schema, visiblePaths, selectedPreset, card.data.name || 'Character');
+
+      const contextInfo = `Character: ${card.data.name}\nDescription: ${card.data.description.slice(0, 1000)}\n\nSchema:\n${JSON.stringify(schema, null, 2)}`;
+      
+      const messages: ChatMessage[] = [
+        { role: 'system', content: MVUZOD_VARLIST_PROMPT },
+        { role: 'user', content: `=== CONTEXT ===\n${contextInfo}\n\n=== MACRO LIST ===\n${baseVarList.content}\n\nHãy thiết kế lại bảng trạng thái.` },
+      ];
+
+      const response = await callAI({
+        profile: activeProfile,
+        params,
+        messages,
+      });
+
+      setGenerated(prev => ({ ...prev, varList: { ...baseVarList, content: response.text.trim() } }));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Lỗi khi gọi AI');
+    } finally {
+      setIsGeneratingVarList(false);
+    }
+  }, [schema, visiblePaths, selectedPreset, card.data]);
+
+  const handleGenerateUpdateRulesAI = useCallback(async () => {
+    if (!schema) return;
+    setIsGeneratingRules(true);
+    try {
+      const activeProfile = useSettingsStore.getState().getActiveProfile();
+      const params = useSettingsStore.getState().generationParams;
+      if (!activeProfile?.apiKey) throw new Error('Chưa cấu hình API AI.');
+
+      const baseUpdateRules = generateUpdateRulesEntry(schema, card.data.name || 'Character');
+
+      const contextInfo = `Character: ${card.data.name}\nDescription: ${card.data.description.slice(0, 1000)}\n\nSchema:\n${JSON.stringify(schema, null, 2)}`;
+      
+      const messages: ChatMessage[] = [
+        { role: 'system', content: MVUZOD_SIMPLE_UPDATE_RULES_PROMPT },
+        { role: 'user', content: `=== CONTEXT ===\n${contextInfo}\n\nHãy viết Quy Tắc Cập Nhật Biến Số bằng tiếng Việt.` },
+      ];
+
+      const response = await callAI({
+        profile: activeProfile,
+        params,
+        messages,
+      });
+
+      setGenerated(prev => ({ ...prev, updateRules: { ...baseUpdateRules, content: response.text.trim() } }));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Lỗi khi gọi AI');
+    } finally {
+      setIsGeneratingRules(false);
+    }
+  }, [schema, card.data]);
 
   const handleAddToCard = useCallback((type: 'varList' | 'updateRules') => {
     const entry = generated[type];
@@ -297,13 +359,58 @@ export function VariableListGenerator({ schema }: { schema: MVUZODSchema | null 
         </div>
       )}
 
-      {/* Generate button */}
-      <button onClick={handleGenerate}
-        className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium
-          hover:bg-primary/90 transition-colors w-full justify-center">
-        <Zap className="w-4 h-4" />
-        Tạo Entries
-      </button>
+      {/* Generate Buttons Section */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Variable List Actions */}
+        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+          <h4 className="text-sm font-semibold flex items-center gap-2">
+            <ListTree className="w-4 h-4 text-primary" />
+            1. Danh sách biến
+          </h4>
+          <p className="text-xs text-muted-foreground">Tạo bảng trạng thái hiển thị bằng EJS/Macro.</p>
+          <div className="flex gap-2">
+            <button onClick={handleGenerateVarListAI} disabled={isGeneratingVarList}
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-violet-500/80 to-primary/80 text-white text-xs font-medium hover:from-violet-500 hover:to-primary transition-all disabled:opacity-50">
+              {isGeneratingVarList ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
+              Tạo bằng AI
+            </button>
+            <button onClick={() => {
+              if (!schema) return;
+              const varList = generateVariableListEntry(schema, visiblePaths, selectedPreset, card.data.name || 'Character');
+              setGenerated(prev => ({ ...prev, varList }));
+            }}
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-muted text-foreground text-xs font-medium hover:bg-muted/80 transition-all">
+              <Zap className="w-3.5 h-3.5" />
+              Tạo tự động
+            </button>
+          </div>
+        </div>
+
+        {/* Update Rules Actions */}
+        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+          <h4 className="text-sm font-semibold flex items-center gap-2">
+            <Settings2 className="w-4 h-4 text-primary" />
+            2. Quy tắc cập nhật
+          </h4>
+          <p className="text-xs text-muted-foreground">Tạo hướng dẫn cập nhật biến bằng tiếng Việt.</p>
+          <div className="flex gap-2">
+            <button onClick={handleGenerateUpdateRulesAI} disabled={isGeneratingRules}
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-violet-500/80 to-primary/80 text-white text-xs font-medium hover:from-violet-500 hover:to-primary transition-all disabled:opacity-50">
+              {isGeneratingRules ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
+              Tạo bằng AI
+            </button>
+            <button onClick={() => {
+              if (!schema) return;
+              const updateRules = generateUpdateRulesEntry(schema, card.data.name || 'Character');
+              setGenerated(prev => ({ ...prev, updateRules }));
+            }}
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-muted text-foreground text-xs font-medium hover:bg-muted/80 transition-all">
+              <Zap className="w-3.5 h-3.5" />
+              Tạo tự động
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* Generated entries preview */}
       {generated.varList && (

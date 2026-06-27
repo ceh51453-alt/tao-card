@@ -223,29 +223,58 @@ Card này dùng hệ thống MVUZOD. Khi tạo entries mới:
 
 export const MVUZOD_INITVAR_PROMPT = `
 Bạn là AI chuyên gia thiết lập giá trị khởi tạo cho hệ thống MVUZOD.
+Bạn có khả năng phân tích sâu bối cảnh card và worldbook để suy luận giá trị phù hợp nhất.
 
-NHIỆM VỤ: Dựa vào schema và lorebook entries, đề xuất giá trị khởi tạo hợp lý cho mọi biến.
+=== NHIỆM VỤ ===
+Đọc KỸ toàn bộ thông tin card (description, personality, scenario, opening messages)
+và lorebook entries → SUY LUẬN giá trị khởi tạo tốt nhất cho mọi biến trong schema.
 
-BẮT BUỘC: Trả về MỘT block JSON duy nhất. KHÔNG comment, KHÔNG giải thích.
+=== QUY TRÌNH SUY LUẬN (BẮT BUỘC) ===
+Trước khi quyết định giá trị, bạn PHẢI suy nghĩ qua các bước sau:
 
-CẤU TRÚC JSON:
+1. PHÂN TÍCH BỐI CẢNH CÂU CHUYỆN:
+   - Card mô tả thế giới/bối cảnh gì? (thời đại, địa điểm, thể loại)
+   - Nhân vật chính bắt đầu ở đâu? làm gì? trạng thái ban đầu thế nào?
+   - Opening message cho thấy câu chuyện bắt đầu từ cảnh nào?
+
+2. QUÉT LOREBOOK TÌM DỮ KIỆN CỤ THỂ:
+   - Entries có nhắc địa điểm ban đầu, sự kiện mở đầu không?
+   - NPC nào xuất hiện đầu tiên? Quan hệ ban đầu với player ra sao?
+   - Hệ thống game (tu luyện, chiến đấu, v.v.) bắt đầu ở cấp nào?
+   - Có entries về vật phẩm ban đầu, kỹ năng khởi đầu không?
+   - Có quy tắc nào về giá trị khởi tạo (ví dụ: "người chơi bắt đầu là học sinh", "HP ban đầu 100")?
+
+3. SUY LUẬN GIÁ TRỊ PHÙ HỢP:
+   - String: điền TÊN CỤ THỂ lấy từ lorebook/card (tên địa điểm, tên NPC, tên trạng thái thực)
+   - Number: chọn giá trị hợp lý theo bối cảnh (nếu là học sinh mới → stats thấp; nếu là chiến binh → stats cao hơn)
+   - Enum: chọn giá trị enum phù hợp với cảnh mở đầu trong opening message
+   - Record NPC: tạo sẵn NPC đầu tiên nếu opening message có nhắc đến NPC
+   - Record Inventory: thêm vật phẩm ban đầu nếu lorebook có đề cập
+   - Boolean: suy luận trạng thái ban đầu (ví dụ: isAlive=true, hasWeapon=false)
+
+4. KIỂM TRA NHẤT QUÁN:
+   - Giá trị khởi tạo PHẢI nhất quán với nội dung opening message
+   - Tên địa điểm, NPC, vật phẩm PHẢI khớp chính xác với tên trong lorebook entries
+   - Nếu opening nói "bạn đang ở trường học" → Khu vực = tên trường cụ thể từ lorebook
+
+=== BẮT BUỘC OUTPUT FORMAT ===
+Trả về MỘT block JSON duy nhất. KHÔNG comment, KHÔNG giải thích bên ngoài JSON.
+
 {
   "initVarData": {
-    // Một object lồng theo đúng cấu trúc schema
-    // VÍ DỤ:
-    // "世界": { "当前时间": "昼 12:00", "当前地点": "学校" },
-    // "主角": { "物品栏": {} }
+    // Object lồng theo đúng cấu trúc schema
+    // PHẢI dùng tên/giá trị CỤ THỂ từ card, KHÔNG dùng placeholder generic
   },
-  "reasoning": "Giải thích ngắn tại sao chọn giá trị này"
+  "reasoning": "Giải thích chi tiết: bạn đã tìm thấy gì trong lorebook/card để quyết định từng giá trị. Ví dụ: 'Opening message nhắc đến gác xép nhà ông nội → Khu vực = Gác xép nhà ông nội. Lorebook entry [NPC] Lan cho thấy cô là bạn cùng lớp → NPC.Lan có mặt = true.'"
 }
 
-NGUYÊN TẮC:
-• Đọc lorebook entries để hiểu bối cảnh câu chuyện, lấy thông tin khởi đầu phù hợp
-• Number: đặt giá trị ban đầu hợp lý (ví dụ HP=100, 好感度=50, tiền=5000)
-• String: đặt giá trị mô tả trạng thái ban đầu, KHÔNG để "Chờ khởi tạo" trừ khi không xác định
-• Record: có thể để {} rỗng hoặc tạo vài item mẫu phù hợp với lorebook
-• Enum: chọn giá trị mặc định phù hợp nhất cho đầu câu chuyện
-• Giá trị phải NHẤT QUÁN với lore: nếu lorebook nói nhân vật bắt đầu ở "学校" thì đặt 当前地点="学校"
+=== NGUYÊN TẮC QUAN TRỌNG ===
+• KHÔNG BAO GIỜ để giá trị generic như "Chờ khởi tạo", "Chưa xác định", "N/A" trừ khi THỰC SỰ không tìm được thông tin
+• LUÔN ưu tiên dùng tên/giá trị CỤ THỂ lấy từ card description, scenario, opening messages, hoặc lorebook
+• Number: nghĩ về LOGIC câu chuyện (ví dụ: nhân vật là học sinh cấp 3 → Thể lực ở mức D hoặc C, không phải A)
+• Enum: chọn giá trị phù hợp với CẢNH ĐẦU TIÊN (opening message), không chọn random
+• Record NPC: chỉ tạo NPC nào XUẤT HIỆN trong cảnh đầu (có mặt = true), các NPC khác chưa cần tạo
+• Hãy tưởng tượng bạn là game master đang setup trạng thái đầu game — mọi thứ phải logic và immersive
 `;
 
 // ─── 5. UPDATE RULES GENERATION PROMPT ───────────────────────────────────────
@@ -263,26 +292,27 @@ CẤU TRÚC JSON:
   "updateRules": {
     // Map từ field path → array of check rules
     // VÍ DỤ:
-    // "/世界/当前时间": {
+    // "/Thế giới/Thời gian hiện tại": {
     //   "type": "string",
-    //   "format": "YYYY年MM月DD日 星期X HH:MM",
-    //   "checkRules": ["根据对话和剧情进展推算时间变化", "一天之内的场景不应跳太远"]
+    //   "format": "YYYY-MM-DD Thứ X HH:MM",
+    //   "checkRules": ["Tính toán thời gian dựa trên đối thoại và diễn biến cốt truyện", "Không nên nhảy cóc quá nhiều thời gian trong một cảnh"]
     // },
-    // "/角色名/好感度": {
+    // "/Tên nhân vật/Độ thiện cảm": {
     //   "type": "number",
     //   "range": "0~100",
-    //   "checkRules": ["根据角色对{{user}}行为的感知和反应调整 ±(3~6)", "仅在角色当前在场时才更新"]
+    //   "checkRules": ["Điều chỉnh dựa trên phản ứng của nhân vật với hành động của {{user}} ±(3~6)", "Chỉ cập nhật khi nhân vật đang có mặt trong cảnh"]
     // }
   },
-  "reasoning": "Giải thích ngắn logic chung"
+  "reasoning": "Giải thích ngắn gọn logic chung"
 }
 
 NGUYÊN TẮC:
 • Đọc lorebook để hiểu mechanics và rules của thế giới
+• BẮT BUỘC VIẾT CHECK RULES BẰNG TIẾNG VIỆT.
 • Number với clamp: ghi rõ range (ví dụ "0~100")
-• 好感度/依存度: rules phải bao gồm "仅在角色在场时更新" và mức thay đổi ±(3~6)
-• Record (物品栏): rules về khi nào thêm/xóa item, điều kiện pickBy
-• String (thời gian/地点): rules về format, logic chuyển đổi
+• Thiện cảm/Độ phụ thuộc: rules phải bao gồm "Chỉ cập nhật khi nhân vật có mặt" và mức thay đổi ±(3~6)
+• Record (Túi đồ/Inventory): rules về khi nào thêm/xóa item, điều kiện pickBy
+• String (Thời gian/Địa điểm): rules về format, logic chuyển đổi
 • Check rules phải CỤ THỂ cho từng biến, không generic
 • Tham khảo lorebook entries để viết rules phù hợp với thế giới quan
 `;
@@ -361,4 +391,49 @@ THIẾT KẾ THÔNG MINH:
 • Nếu mô tả nhắc "lựa chọn/route" → dùng enum
 • Thêm 2-3 fields mà người dùng có thể chưa nghĩ tới nhưng hữu ích
 • Schema nên có 10-30 fields tùy độ phức tạp
+`;
+
+// ─── 7. VARLIST GENERATION PROMPT ────────────────────────────────────────────
+
+export const MVUZOD_VARLIST_PROMPT = `
+Bạn là AI chuyên gia thiết kế giao diện UI dạng văn bản (text-based UI) cho RPG game trên SillyTavern.
+
+=== NHIỆM VỤ ===
+Thiết kế một Bảng Trạng Thái (Variable List) đẹp mắt, dễ nhìn bằng Markdown, sử dụng danh sách các biến và công thức macro (EJS/SillyTavern) được cung cấp. Bảng trạng thái này sẽ hiển thị cho AI đọc trong quá trình chat.
+
+=== INPUT BẠN SẼ NHẬN ĐƯỢC ===
+1. SCHEMA & BỐI CẢNH: Mô tả về game, nhân vật.
+2. MACRO LIST: Danh sách các công thức lấy biến (ví dụ: <%= getvar('...') %> hoặc {{format_message_variable::...}}).
+
+=== YÊU CẦU THIẾT KẾ ===
+1. BỐ CỤC: Phân chia thành các khu vực rõ ràng (ví dụ: [🌟 THẾ GIỚI], [👤 NHÂN VẬT], [🎒 TÚI ĐỒ], [⚔️ CHIẾN ĐẤU]).
+2. EMOJI: Thêm các emoji phù hợp trước tên biến để tăng tính trực quan.
+3. CHÍNH XÁC: PHẢI sử dụng CHÍNH XÁC các công thức macro được cung cấp ở phần INPUT. Không tự bịa ra biến mới hay sửa công thức macro.
+4. NGẮN GỌN: Đừng viết quá dài dòng, AI cần đọc nhanh trạng thái. Không giải thích lằng nhằng.
+
+=== BẮT BUỘC OUTPUT FORMAT ===
+Chỉ trả về nội dung Markdown của Bảng Trạng Thái, không bình luận hay đặt trong code block markdown. Nếu có code block markdown bao ngoài, hãy bỏ đi.
+`;
+
+// ─── 8. SIMPLE UPDATE RULES GENERATION PROMPT ────────────────────────────────
+
+export const MVUZOD_SIMPLE_UPDATE_RULES_PROMPT = `
+Bạn là AI Game Master chuyên viết quy tắc cập nhật biến số cho game RPG trên SillyTavern.
+
+=== NHIỆM VỤ ===
+Dựa vào Zod Schema và bối cảnh (Lorebook/Card), hãy viết một bản Quy Tắc Cập Nhật Biến Số bằng tiếng Việt đơn giản, trực quan để hướng dẫn một AI khác biết cách cập nhật biến khi chat.
+
+=== YÊU CẦU ===
+1. LỜI MỞ ĐẦU: Nhắc nhở AI (nhân vật đóng vai) rằng: "Khi viết phản hồi, nếu có bất kỳ thay đổi nào về trạng thái game, HÃY cập nhật biến bằng khối <UpdateVariable> ở CUỐI phản hồi."
+2. QUY TẮC CƠ BẢN:
+   - Chỉ cập nhật biến đã thay đổi thực sự.
+   - Dùng "delta" cho thay đổi tương đối (cộng/trừ), "replace" cho thay đổi tuyệt đối.
+3. GIẢI THÍCH SCHEMA:
+   - Liệt kê ngắn gọn một số biến quan trọng và loại dữ liệu (string, number, giới hạn min/max nếu có).
+4. VÍ DỤ CỤ THỂ:
+   - Viết 1 ví dụ cụ thể về cú pháp <UpdateVariable> có chứa mảng JSON Patch.
+   - Các biến trong ví dụ PHẢI LẤY TỪ SCHEMA và phù hợp với tên nhân vật/bối cảnh. (Ví dụ: Nếu bối cảnh là Tu tiên, ví dụ nên là update cấp bậc, linh lực).
+
+=== BẮT BUỘC OUTPUT FORMAT ===
+Chỉ trả về nội dung văn bản (text/markdown) của Quy Tắc Cập Nhật, không bình luận hay đặt trong code block markdown (\`\`\`).
 `;

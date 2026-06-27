@@ -105,6 +105,7 @@ export function CopilotPanel() {
   const addEntry = useCardStore(s => s.addEntry);
   const updateEntry = useCardStore(s => s.updateEntry);
   const deleteEntry = useCardStore(s => s.deleteEntry);
+  const updateField = useCardStore(s => s.updateField);
   const settings = useSettingsStore();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -199,7 +200,7 @@ export function CopilotPanel() {
           addEntry,
           (id, patch) => updateEntry(id, patch),
           deleteEntry,
-          () => {}, // updateField not needed for now
+          updateField,
         );
       },
       getCard: () => useCardStore.getState().card,
@@ -218,7 +219,7 @@ export function CopilotPanel() {
 
     setIsRunning(false);
     setStatus(null);
-  }, [input, activeProfile, mode, card, settings.generationParams, messages, autoApply, addEntry, updateEntry, deleteEntry, pendingAttachments]);
+  }, [input, activeProfile, mode, card, settings.generationParams, messages, autoApply, addEntry, updateEntry, deleteEntry, updateField, pendingAttachments]);
 
   const handleActionDecision = useCallback((decision: 'apply' | 'skip') => {
     if (actionResolveRef.current) {

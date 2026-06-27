@@ -125,7 +125,7 @@ Bấm nút **Xuất bản Card** ở góc trên cùng bên phải để mở Wiz
 
 ## 4. 📚 QUẢN LÝ SỔ TAY TRI THỨC (LorebookPage)
 
-Lorebook (Worldbook) là nơi chứa toàn bộ tri thức của nhân vật và bối cảnh thế giới quan. Hệ thống quản lý Lorebook được thiết kế dưới dạng Workspace đa nhiệm với 6 tab chuyên biệt.
+Lorebook (Worldbook) là nơi chứa toàn bộ tri thức của nhân vật và bối cảnh thế giới quan. Hệ thống quản lý Lorebook được thiết kế dưới dạng Workspace đa nhiệm với các tab công cụ chuyên biệt.
 
 ### 4.1 Danh Sách Entries & Trình Biên Tập Chi Tiết
 Giao diện danh sách được tối ưu bằng bộ ảo hóa danh sách (**Virtualized List**) giúp hiển thị mượt mà hàng ngàn entries mà không bị giật lag trình duyệt.
@@ -194,6 +194,12 @@ Rà soát chất lượng Lorebook theo quy chuẩn "Minh Nguyệt Thu Thanh":
 *   **Kiểm tra Bát Cổ:** Xác thực cấu trúc của các entry nhân thiết có đủ các trường cốt lõi hay không.
 *   **Kiểm tra Tag cấu trúc `<tên_idN>`:** Đảm bảo các thẻ phân đoạn dạng XML đúng chuẩn của phương pháp Minh Nguyệt.
 *   **Kiểm tra Bảng điều sắc:** Xác minh sự hiện diện của bảng màu tính cách giúp định hướng sắc thái diễn vai của AI.
+
+### 4.10 Sinh EJS Điều Khiển (TCTRL)
+Công cụ tự động phân tích và sinh mã EJS (macro) để điều khiển động việc kích hoạt và nạp các entry trong Lorebook (`@@TCTRL`):
+*   **Budget Worldbook (Token Control):** Cung cấp thanh trượt cấu hình tỷ lệ token tối đa được phép nạp vào context cho Lorebook (ví dụ từ 10% đến 80%). Cơ chế này tự động tính toán dung lượng khả dụng dựa trên độ dài chat history thực tế để tránh lỗi tràn context.
+*   **Batch song song:** Cho phép AI xử lý tối ưu đồng thời nhiều entry (1, 2, 3, 5, hoặc 10 entry song song). Hệ thống tích hợp rate limiter tự động điều tiết tốc độ để tránh bị chặn IP bởi các provider AI.
+*   **Báo cáo ước tính:** Hiển thị chi tiết số lượng entry cần tối ưu, số token dự kiến, số batches và thời gian chạy ước tính để người dùng dễ dàng theo dõi.
 
 ---
 
@@ -373,16 +379,21 @@ MVUZOD Studio là môi trường lập trình trực quan giúp biến thẻ Sil
     *   `Array / Object:` Mảng hoặc đối tượng phức tạp để lưu trữ túi đồ (Inventory) hoặc chỉ số chi tiết của NPC.
 
 ### 7.2 InitVar Editor (Thiết Lập Khởi Tạo)
-*   Hiển thị danh sách các biến bạn vừa tạo trong Schema dưới dạng bảng điền thông tin trực quan.
-*   Nhập các giá trị ban đầu cho trò chơi (ví dụ: Khởi đầu game với `HP = 100`, `Vàng = 10`, `Túi đồ = ["Kiếm gỗ", "Bánh mì"]`). Các giá trị này sẽ được ghi vào thuộc tính `variables` của thẻ nhân vật để SillyTavern nạp khi bắt đầu chat lượt đầu tiên.
+*   Hiển thị danh sách các biến trong Schema dưới dạng giao diện điền thông tin trực quan.
+*   Nhập các giá trị ban đầu cho trò chơi (ví dụ: Khởi đầu game với `HP = 100`, `Vàng = 10`, `Túi đồ = ["Kiếm gỗ", "Bánh mì"]`).
+*   **Đồng bộ thời gian thực & Xác thực Zod:** Mọi giá trị bạn điền sẽ được tự động đồng bộ ngay lập tức với Card Store (`card.data.variables`) và đi qua lớp xác thực Zod Schema để đảm bảo tính hợp lệ, loại bỏ hoàn toàn lỗi mất dữ liệu khi chuyển tab.
 
 ### 7.3 Biến Số (Variable List Generator)
-*   Tự động biên dịch toàn bộ Schema thành một entry Lorebook mang tên `[variables]`.
-*   Entry này chứa mô tả kỹ thuật gọn gàng về các biến số hiện tại để nạp thẳng vào context cho AI đọc. Điều này giúp AI luôn biết rõ người chơi đang có bao nhiêu máu, bao nhiêu tiền và đang ở đâu để dẫn dắt cốt truyện chuẩn xác.
+*   Quản lý danh sách các biến hiển thị cho AI đọc dưới dạng Worldbook Entry `[variables]`.
+*   Hỗ trợ 2 phương thức sinh:
+    *   **Tạo tự động:** Sinh nhanh dựa trên các template preset có sẵn (ví dụ: EJS `getvar`).
+    *   **Tạo bằng AI:** Sử dụng mô hình AI quét Zod Schema kết hợp thông tin nhân vật để tự động thiết kế một Bảng trạng thái (Status Panel) bằng Markdown trực quan, chia bố cục khoa học và gắn emoji sinh động, giúp AI dễ dàng theo dõi thông tin game.
 
 ### 7.4 Update Rules (Quy Tắc Cập Nhật Biến)
-*   Thiết lập các quy tắc hướng dẫn AI cách thức cập nhật biến.
-*   Sinh ra entry Lorebook đặc biệt `[mvu_update]` chứa chỉ thị ép AI phải trả về khối lệnh JSON Patch nằm giữa thẻ `<UpdateVariable>...</UpdateVariable>` ở cuối mỗi câu thoại nếu có hành động làm thay đổi chỉ số (ví dụ: người chơi bị trúng đòn thì phải trừ HP).
+*   Thiết lập và quản lý entry Lorebook đặc biệt `[mvu_update]`, chứa chỉ thị ép AI phải trả về khối lệnh JSON Patch nằm giữa thẻ `<UpdateVariable>...</UpdateVariable>` ở cuối mỗi câu thoại khi có biến động chỉ số.
+*   Hỗ trợ 2 phương thức sinh:
+    *   **Tạo tự động:** Sinh nhanh tập hợp quy tắc cập nhật thô.
+    *   **Tạo bằng AI (Tiếng Việt thuần túy):** AI sẽ đọc hiểu bối cảnh nhân vật để tự động viết bản quy tắc cập nhật bằng tiếng Việt, kèm theo ví dụ XML `<UpdateVariable>` chứa mảng JSON Patch được cá nhân hóa sát theo cốt truyện (ví dụ: bối cảnh Tu Tiên sẽ ví dụ về Linh lực, bối cảnh RPG sẽ ví dụ về HP/Vàng).
 
 ### 7.5 Patch Simulator (Giả Lập Cập Nhật)
 *   Nạp thử giá trị biến hiện tại của bạn.
