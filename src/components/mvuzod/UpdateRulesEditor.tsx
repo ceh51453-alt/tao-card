@@ -7,7 +7,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import {
   FileText, Copy, Check,
-  Sparkles, Eye, RefreshCw, Wand2, Loader2,
+  Sparkles, Eye, RefreshCw, Wand2, Loader2, Download,
 } from 'lucide-react';
 import type { MVUZODSchema, MVUZODField } from '../../types/mvuzod.types';
 import { useCardStore } from '../../store/cardStore';
@@ -16,6 +16,8 @@ import { callAI } from '../../lib/ai/client';
 import type { ChatMessage } from '../../types';
 import { MVUZOD_UPDATE_RULES_PROMPT } from '../../prompts/modeMVUZOD';
 import { parseSchemaInferenceResponse } from '../../lib/mvuzod/schemaInferencer';
+import { nextEntryId } from '../../lib/converters/cardDefaults';
+import type { LorebookEntry } from '../../types/lorebook.types';
 
 // ─── YAML Generator ──────────────────────────────────────────────────────
 
@@ -173,6 +175,36 @@ function generateVariableListYAML(schema: MVUZODSchema): string {
   return lines.join('\n');
 }
 
+// ─── Entry injection config ──────────────────────────────────────────────
+
+const ENTRY_CONFIGS: Record<'rules' | 'format' | 'varlist', {
+  comment: string;
+  constant: boolean;
+  positionExt: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+  depth: number;
+  role?: number | null;
+}> = {
+  rules: {
+    comment: '[mvu_update]変量更新規則',
+    constant: true,
+    positionExt: 0,
+    depth: 4,
+  },
+  format: {
+    comment: '[mvu_update]変量出力格式',
+    constant: true,
+    positionExt: 4,
+    depth: 0,
+    role: 1,
+  },
+  varlist: {
+    comment: '変量列表',
+    constant: true,
+    positionExt: 0,
+    depth: 1,
+  },
+};
+
 // ─── Main Component ──────────────────────────────────────────────────────
 
 export function UpdateRulesEditor({ schema }: {
@@ -192,6 +224,60 @@ export function UpdateRulesEditor({ schema }: {
     schema ? generateVariableListYAML(schema) : '(Chưa có schema)',
     [schema]
   );
+
+  const [injected, setInjected] = useState<string | null>(null);
+
+  const handleInject = useCallback((tabId: 'rules' | 'format' | 'varlist', content: string) => {
+    const config = ENTRY_CONFIGS[tabId];
+    const entries = useCardStore.getState().card.data.character_book?.entries ?? [];
+
+    // Find existing entry by comment
+    const existing = entries.find(e => e.comment === config.comment);
+
+    if (existing) {
+      // Update existing entry
+      useCardStore.getState().updateEntry(existing.id, { content });
+      setInjected(`✅ Đã cập nhật entry #${existing.id}`);
+    } else {
+      // Create new entry
+      const id = nextEntryId(entries);
+      const newEntry: LorebookEntry = {
+        id,
+        keys: [],
+        secondary_keys: [],
+        comment: config.comment,
+        content,
+        constant: config.constant,
+        selective: false,
+        insertion_order: 100,
+        enabled: true,
+        position: 'before_char',
+        use_regex: false,
+        extensions: {
+          position: config.positionExt,
+          exclude_recursion: true,
+          display_index: id,
+          probability: 100,
+          useProbability: true,
+          depth: config.depth,
+          selectiveLogic: 0,
+          outlet_name: '',
+          group: '',
+          group_override: false,
+          group_weight: 100,
+          prevent_recursion: true,
+          delay_until_recursion: false,
+          scan_depth: null,
+          match_whole_words: null,
+          ...(config.role !== undefined ? { role: config.role } : {}),
+        } as LorebookEntry['extensions'],
+      };
+      useCardStore.getState().addEntry(newEntry);
+      setInjected(`✅ Đã tạo entry mới #${id}`);
+    }
+
+    setTimeout(() => setInjected(null), 3000);
+  }, []);
 
   const handleCopy = useCallback((content: string, label: string) => {
     navigator.clipboard.writeText(content);
@@ -250,19 +336,37 @@ export function UpdateRulesEditor({ schema }: {
           </p>
           <p className="text-[10px] text-muted-foreground">{activeTabData.description}</p>
         </div>
-        <button
-          onClick={() => handleCopy(activeTabData.yaml, activeTab)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary
-            text-xs font-medium hover:bg-primary/20 transition-colors"
-        >
-          {copied === activeTab ? (
-            <><Check className="w-3 h-3" /> Đã copy!</>
-          ) : (
-            <><Copy className="w-3 h-3" /> Copy nội dung</>
-          )}
-        </button>
-        {activeTab === 'rules' && <AIUpdateRulesButton schema={schema} />}
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => handleCopy(activeTabData.yaml, activeTab)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary
+              text-xs font-medium hover:bg-primary/20 transition-colors"
+          >
+            {copied === activeTab ? (
+              <><Check className="w-3 h-3" /> Đã copy!</>
+            ) : (
+              <><Copy className="w-3 h-3" /> Copy nội dung</>
+            )}
+          </button>
+          <button
+            onClick={() => handleInject(activeTab, activeTabData.yaml)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-emerald-500/80 to-teal-500/80
+              text-white text-xs font-medium hover:from-emerald-500 hover:to-teal-500 transition-all
+              shadow-sm shadow-emerald-500/10"
+          >
+            <Download className="w-3 h-3" /> Inject vào card
+          </button>
+          {activeTab === 'rules' && <AIUpdateRulesButton schema={schema} />}
+        </div>
       </div>
+
+      {/* Inject status */}
+      {injected && (
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+          <Check className="w-3 h-3 text-emerald-400" />
+          <span className="text-[10px] text-emerald-400 font-medium">{injected}</span>
+        </div>
+      )}
 
       {/* YAML Preview */}
       <div className="rounded-xl border border-border bg-card overflow-hidden">

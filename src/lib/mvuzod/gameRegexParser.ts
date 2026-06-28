@@ -350,8 +350,8 @@ export function countScriptsInPartial(text: string): number {
  */
 export function getExpectedScriptCount(component: string): { min: number; max: number } {
   switch (component) {
-    case 'status_bar': return { min: 2, max: 4 };
-    case 'opening_form': return { min: 2, max: 3 };
+    case 'status_bar': return { min: 1, max: 4 };
+    case 'opening_form': return { min: 1, max: 3 };
     case 'game_screen': return { min: 3, max: 5 };
     case 'full_set': return { min: 6, max: 15 };
     case 'free_form': return { min: 1, max: 20 };

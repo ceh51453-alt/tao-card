@@ -97,8 +97,9 @@ Pattern A-1: Widget thẻ ngang đơn giản
   │   padding:12px; background:#1a202c; color:#e2e8f0;
   │   font-family:'Noto Serif SC',serif; margin:8px 0">
   │   <strong style="color:#f6c90e">{{char}}</strong>
-  │   <!-- TavernHelper EJS để đọc biến: -->
-  │   <!-- <%= getvar('stat_data.Người chơi.HP',{defaults:100}) %>/100 HP -->
+  │   <!-- TavernHelper EJS để đọc biến (key có khoảng trắng dùng _.get array path): -->
+  │   <%_ const d = Mvu.getMvuData({type:'message',message_id:'latest'})?.stat_data ?? {}; _%>
+  │   <%= _.get(d, ['Người chơi', 'HP'], 100) %>/100 HP
   │ </div>
   │ ` + '```' + `
   └───────────────────────────────────────────────────────────────┘
@@ -351,10 +352,12 @@ Responsive (mobile-friendly):
 ❌ ĐỪNG dùng markdownOnly=true VÀ promptOnly=true đồng thời (vô nghĩa)
 ❌ ĐỪNG dùng /.*/ (quá broad) cho AI Output — sẽ thay toàn bộ tin nhắn
 ❌ ĐỪNG bỏ flag g nếu cần match nhiều lần trong một tin nhắn
-❌ ĐỪNG để replaceString quá dài (>50KB) — gây lag render
+❌ replaceString dài ĐỌC OK nhưng tránh >100KB (có thể lag render)
+   Với TavernHelper, replaceString dài vài chục KB là bình thường cho status bar chi tiết
 ❌ ĐỪNG dùng position:fixed trong HTML của replaceString (phá layout chat)
 ❌ ĐỪNG dùng document.querySelector/innerHTML trong script HTML của regex
-   (regex renderer là passive, không có JS execution — khác với TavernHelper)
+   (TavernHelper CÓ hỗ trợ EJS trong replaceString: <%_ _%> và <%= %> — nhưng KHÔNG có DOM JS)
+   Dùng EJS <%_ _%> cho logic, KHÔNG dùng document.querySelector
 ❌ ĐỪNG tạo regex chồng nhau nếu không kiểm tra thứ tự
    (SillyTavern áp regex theo thứ tự index — thứ tự quan trọng)
 

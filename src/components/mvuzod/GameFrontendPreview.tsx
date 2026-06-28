@@ -173,10 +173,15 @@ export function GameFrontendPreview({ schema }: GameFrontendPreviewProps) {
               setLoadingStatus(`⏳ Phản hồi bị cắt — đang yêu cầu AI viết tiếp (lượt ${callCount}/${maxCalls}) — đã nhận ~${partialCount} scripts...`);
             }
 
+            // Ensure minimum 50k tokens for detailed regex output (status bar HTML + EJS can be very long)
+            const minTokens = 50000;
+            const effectiveMaxTokens = Math.max(params.max_tokens || 4096, minTokens);
+
             const response = await callAI({
               profile: activeProfile,
               params: {
                 ...params,
+                max_tokens: effectiveMaxTokens,
                 temperature: attempt > 1 ? 0.3 : params.temperature,
                 useJsonResponseFormat: true,
               },
@@ -217,12 +222,16 @@ export function GameFrontendPreview({ schema }: GameFrontendPreviewProps) {
 
           const parsed = parseGameRegexResponse(repairedText);
 
-          // ═══ PHASE 3: Post-generation verification — request missing scripts ═══
+          // ═══ PHASE 3: Post-generation recovery — only when response was truncated/broken ═══
+          // This is a RECOVERY mechanism, not a "create more" mechanism.
+          // Only triggers when: (1) response was multi-chunk (truncated), AND (2) parsing yielded fewer scripts than minimum
+          // If AI completed normally in 1 chunk, it intentionally created that many scripts — don't ask for more.
           const allScripts = [...parsed.scripts];
           const expected = getExpectedScriptCount(selectedComponent);
+          const wasTruncated = chunks.length > 1; // Response was cut and continued
 
-          if (selectedComponent !== 'free_form' && allScripts.length < expected.min) {
-            setLoadingStatus(`⚠️ Chỉ nhận được ${allScripts.length}/${expected.min} scripts tối thiểu. Đang gọi AI bổ sung...`);
+          if (selectedComponent !== 'free_form' && allScripts.length < expected.min && wasTruncated) {
+            setLoadingStatus(`⚠️ Response bị cắt, chỉ recover được ${allScripts.length}/${expected.min} scripts. Đang gọi AI bổ sung...`);
 
             const existingNames = allScripts.map(s => s.scriptName).join(', ');
             const supplementMessages: ChatMessage[] = [
@@ -231,9 +240,9 @@ export function GameFrontendPreview({ schema }: GameFrontendPreviewProps) {
               { role: 'assistant', content: JSON.stringify({ scripts: allScripts, explanation: parsed.explanation }) },
               {
                 role: 'user',
-                content: `Bạn đã tạo ${allScripts.length} scripts: [${existingNames}].\n` +
+                content: `Phản hồi trước bị cắt giữa chừng. Bạn đã tạo ${allScripts.length} scripts: [${existingNames}].\n` +
                   `Thành phần "${selectedComponent}" cần TỐI THIỂU ${expected.min} scripts.\n` +
-                  `Hãy tạo THÊM các scripts còn thiếu. CHỈ trả về JSON với scripts MỚI, KHÔNG lặp lại scripts đã có.\n` +
+                  `Hãy tạo THÊM các scripts còn thiếu do bị cắt. CHỈ trả về JSON với scripts MỚI, KHÔNG lặp lại scripts đã có.\n` +
                   `Format: { "scripts": [...], "explanation": "..." }`,
               },
             ];
@@ -653,9 +662,17 @@ Bạn có thể viết tự do — AI sẽ tạo regex scripts theo mô tả.`}
               return (
                 <div key={index} className={`${hasError ? 'bg-red-500/5' : ''}`}>
                   {/* Script header */}
-                  <button
+                  <div
                     onClick={() => toggleExpand(index)}
-                    className="w-full px-4 py-2.5 flex items-center gap-2 hover:bg-muted/20 transition-colors text-left"
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleExpand(index);
+                      }
+                    }}
+                    className="w-full px-4 py-2.5 flex items-center gap-2 hover:bg-muted/20 transition-colors text-left cursor-pointer"
                   >
                     {isExpanded ? (
                       <ChevronDown className="w-3 h-3 text-muted-foreground shrink-0" />
@@ -679,7 +696,7 @@ Bạn có thể viết tự do — AI sẽ tạo regex scripts theo mô tả.`}
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>
-                  </button>
+                  </div>
 
                   {/* Expanded details */}
                   {isExpanded && (

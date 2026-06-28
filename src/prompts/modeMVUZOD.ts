@@ -437,3 +437,47 @@ Dựa vào Zod Schema và bối cảnh (Lorebook/Card), hãy viết một bản 
 === BẮT BUỘC OUTPUT FORMAT ===
 Chỉ trả về nội dung văn bản (text/markdown) của Quy Tắc Cập Nhật, không bình luận hay đặt trong code block markdown (\`\`\`).
 `;
+
+// ─── 9. EXPAND VARIABLES PROMPT ──────────────────────────────────────────────
+
+export const MVUZOD_EXPAND_VARIABLES_PROMPT = `
+Bạn là AI chuyên gia mở rộng MVUZOD schema cho SillyTavern TavernHelper.
+
+=== NHIỆM VỤ ===
+Người dùng ĐÃ CÓ schema hiện tại. Họ muốn THÊM biến mới vào schema.
+Bạn phải thiết kế THÊM các fields mới dựa trên mô tả của người dùng.
+
+=== QUY TẮC BẮT BUỘC ===
+1. CHỈ trả về các fields MỚI cần thêm — KHÔNG trả lại fields đã có trong schema
+2. Path của field mới KHÔNG ĐƯỢC trùng với field đã có
+3. Nếu field mới thuộc vào object đã tồn tại (VD: thêm field vào /Người chơi), dùng path đầy đủ (VD: /Người chơi/Kỹ năng mới)
+4. Nếu field mới là nhóm mới hoàn toàn, tạo object root mới
+5. Tuân thủ quy tắc đặt tên: tiếng Việt, nhất quán với schema hiện tại
+6. Luôn có constraints.prefault cho string fields
+7. Number phải có clamp nếu có giới hạn logic
+8. Record cho danh sách NPC/vật phẩm, KHÔNG dùng Array
+
+=== BẮT BUỘC OUTPUT FORMAT ===
+Trả về MỘT block JSON duy nhất. KHÔNG comment, KHÔNG giải thích bên ngoài JSON.
+
+{
+  "newFields": [
+    {
+      "path": "/Đường_dẫn/Tên_biến",
+      "type": "string|number|boolean|object|record|array",
+      "label": "Tên hiển thị",
+      "defaultValue": "giá trị mặc định",
+      "constraints": {},
+      "children": []
+    }
+  ],
+  "reasoning": "Giải thích ngắn gọn tại sao thiết kế như vậy"
+}
+
+=== HƯỚNG DẪN THIẾT KẾ ===
+• Đọc kỹ schema hiện tại để hiểu cấu trúc và phong cách đặt tên
+• Fields mới phải HÒA HỢP với schema hiện tại (cùng ngôn ngữ, cùng style)
+• Nếu mô tả mơ hồ, hãy thiết kế thông minh: thêm fields hữu ích mà người dùng có thể chưa nghĩ tới
+• Object nesting tối đa 3 cấp
+• Mỗi field phải có ý nghĩa gameplay, KHÔNG thêm field thừa
+`;

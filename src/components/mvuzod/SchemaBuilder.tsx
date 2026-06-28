@@ -18,7 +18,7 @@ import {
   Lock, FolderPlus,
   Code, Layers, Scan, RotateCcw,
   Zap, ListOrdered, LayoutList, Square,
-  Lightbulb, Brain,
+  Lightbulb, Brain, Loader2, Sparkles,
 } from 'lucide-react';
 import { useCardStore } from '../../store/cardStore';
 import type { MVUZODSchema, MVUZODField, MVUZODConstraints } from '../../types/mvuzod.types';
@@ -28,7 +28,7 @@ import { analyzeLorebookForSchema, buildMinimalSchemaFromReport, parseSchemaInfe
 import { buildMVUZODScripts } from '../../lib/mvuzod/tavernScriptBuilder';
 import { useSettingsStore } from '../../store/settingsStore';
 import { callAI } from '../../lib/ai/client';
-import { MVUZOD_SCHEMA_INFERENCE_PROMPT, MVUZOD_IDEA_TO_SCHEMA_PROMPT } from '../../prompts/modeMVUZOD';
+import { MVUZOD_SCHEMA_INFERENCE_PROMPT, MVUZOD_IDEA_TO_SCHEMA_PROMPT, MVUZOD_EXPAND_VARIABLES_PROMPT } from '../../prompts/modeMVUZOD';
 import type { ChatMessage } from '../../types';
 import { cn } from '../../lib/utils';
 
@@ -1348,12 +1348,177 @@ function ActionsPanel({
         )}
       </div>
 
+      {/* AI Expand Variables */}
+      <AIExpandVariables schema={schema} />
+
       {/* Reset */}
       <button onClick={onReset}
         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground
           hover:text-foreground hover:bg-muted/50 transition-colors">
         <RotateCcw className="w-3.5 h-3.5" /> Chọn nguồn schema khác
       </button>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AI EXPAND VARIABLES
+// ═══════════════════════════════════════════════════════════════════════════
+
+const EXPAND_CHIPS = [
+  { label: '👥 +NPC Record', text: 'Thêm Record NPC mới với các trường: cấp bậc, chủng tộc, có mặt, quan hệ' },
+  { label: '🎒 +Inventory', text: 'Thêm Record túi đồ/inventory với tên vật phẩm, số lượng, mô tả' },
+  { label: '⚔️ +Stat số', text: 'Thêm stat số mới (HP, MP, Attack, Defense...) với clamp min/max' },
+  { label: '🌟 +Kỹ năng', text: 'Thêm hệ thống kỹ năng với Record kỹ năng: tên, level, cooldown, mô tả' },
+  { label: '💕 +Quan hệ', text: 'Thêm hệ thống quan hệ: thiện cảm (number 0-100), trạng thái, sự kiện' },
+  { label: '🏠 +Địa điểm', text: 'Thêm hệ thống địa điểm với Record: tên, đã khám phá, mô tả, NPC có mặt' },
+  { label: '📋 +Quest', text: 'Thêm hệ thống nhiệm vụ với Record quest: tên, trạng thái, phần thưởng, tiến độ' },
+  { label: '⏰ +Thời gian', text: 'Thêm hệ thống thời gian: ngày, giờ, mùa, thời tiết' },
+];
+
+function AIExpandVariables({ schema }: { schema: MVUZODSchema }) {
+  const [expandText, setExpandText] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const setMvuzodSchema = useCardStore(s => s.setMvuzodSchema);
+  const createSnapshot = useCardStore(s => s.createSnapshot);
+
+  const handleExpand = useCallback(async () => {
+    if (!expandText.trim()) return;
+    setLoading(true);
+    setError(null);
+    setStatus('Đang kết nối AI...');
+
+    try {
+      const activeProfile = useSettingsStore.getState().getActiveProfile();
+      const params = useSettingsStore.getState().generationParams;
+      if (!activeProfile?.apiKey) throw new Error('Chưa cấu hình API AI.');
+
+      const schemaDesc = JSON.stringify(schema, null, 2);
+      setStatus('Đang gửi schema + mô tả...');
+
+      const messages: ChatMessage[] = [
+        { role: 'system', content: MVUZOD_EXPAND_VARIABLES_PROMPT },
+        {
+          role: 'user',
+          content: `SCHEMA HIỆN TẠI:\n${schemaDesc}\n\nYÊU CẦU THÊM BIẾN:\n${expandText.trim()}\n\nHãy thiết kế các fields mới cần thêm. Trả về JSON.`,
+        },
+      ];
+
+      const response = await callAI({
+        profile: activeProfile,
+        params: { ...params, useJsonResponseFormat: true },
+        messages,
+      });
+
+      setStatus('Phân tích phản hồi...');
+      const parsed = parseSchemaInferenceResponse(response.text);
+      const newFields = (parsed as Record<string, unknown>).newFields as MVUZODField[] | undefined;
+
+      if (!newFields || !Array.isArray(newFields) || newFields.length === 0) {
+        throw new Error('AI không trả về fields mới hợp lệ.');
+      }
+
+      // Snapshot before merge
+      await createSnapshot('Trước khi thêm biến mới');
+
+      // Merge new fields into existing schema
+      const updatedSchema = structuredClone(schema);
+      for (const newField of newFields) {
+        // Check if field needs to be added as child of existing object
+        const parentPath = newField.path.split('/').slice(0, -1).join('/');
+        if (parentPath && parentPath !== '') {
+          const parent = findFieldByPath(updatedSchema.fields, parentPath);
+          if (parent && parent.children) {
+            // Check no duplicate
+            if (!parent.children.some(c => c.path === newField.path)) {
+              parent.children.push(newField);
+            }
+            continue;
+          }
+        }
+        // Add as root field if not added as child
+        if (!updatedSchema.fields.some(f => f.path === newField.path)) {
+          updatedSchema.fields.push(newField);
+        }
+      }
+
+      setMvuzodSchema(updatedSchema);
+      setStatus(`✅ Đã thêm ${newFields.length} field(s) mới!`);
+      setExpandText('');
+      setTimeout(() => setStatus(''), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setStatus('');
+    } finally {
+      setLoading(false);
+    }
+  }, [expandText, schema, setMvuzodSchema, createSnapshot]);
+
+  return (
+    <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 space-y-2.5">
+      <h4 className="text-xs font-semibold flex items-center gap-1.5">
+        <Sparkles className="w-3.5 h-3.5 text-emerald-400" /> AI Mở rộng biến
+      </h4>
+      <p className="text-[10px] text-muted-foreground">
+        Mô tả biến muốn thêm — AI sẽ merge vào schema hiện tại (không ghi đè).
+      </p>
+
+      {/* Quick chips */}
+      <div className="flex flex-wrap gap-1">
+        {EXPAND_CHIPS.map((chip) => (
+          <button
+            key={chip.label}
+            onClick={() => setExpandText(prev => prev ? `${prev}\n${chip.text}` : chip.text)}
+            disabled={loading}
+            className="px-2 py-0.5 rounded-full text-[9px] border border-border bg-background/50
+              hover:bg-emerald-500/10 hover:border-emerald-500/30 transition-colors
+              disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {chip.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Textarea */}
+      <textarea
+        value={expandText}
+        onChange={e => setExpandText(e.target.value)}
+        disabled={loading}
+        placeholder={`VD: Thêm hệ thống kỹ năng gồm 3 slot, mỗi slot có:\n• Tên kỹ năng (string)\n• Level (number 1-10)\n• Cooldown (number 0-99)`}
+        className="w-full px-3 py-2 text-xs rounded-lg border border-border bg-background
+          placeholder:text-muted-foreground/40 resize-y
+          focus:outline-none focus:ring-2 focus:ring-emerald-400/20 focus:border-emerald-400/40 transition-all"
+        rows={3}
+      />
+
+      {/* Action row */}
+      {loading ? (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+          <span className="animate-pulse">{status}</span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExpand}
+            disabled={!expandText.trim()}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500
+              text-white text-xs font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed
+              transition-all shadow-sm shadow-emerald-500/20"
+          >
+            <Sparkles className="w-3.5 h-3.5" /> AI Thêm biến
+          </button>
+          {status && <span className="text-[10px] text-emerald-400">{status}</span>}
+        </div>
+      )}
+
+      {error && (
+        <p className="text-[10px] text-red-400 mt-1" title={error}>
+          ❌ {error}
+        </p>
+      )}
     </div>
   );
 }
