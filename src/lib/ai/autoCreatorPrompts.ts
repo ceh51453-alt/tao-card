@@ -161,7 +161,7 @@ Yêu cầu định dạng JSON chính xác:
     ]
   },
   "initVarEntry": "Nội dung cho [initvar] dưới dạng YAML/JSON (nếu được yêu cầu)",
-  "updateRulesEntry": "Nội dung cho [mvu_update]変量更新規則 (nếu được yêu cầu)",
+  "updateRulesEntry": "Nội dung cho [mvu_update]Quy tắc cập nhật biến (nếu được yêu cầu)",
   "varListEntry": "Nội dung hiển thị biến (nếu được yêu cầu)"
 }
 ${JSON_FORMAT_REQUIREMENT}

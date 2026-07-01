@@ -481,3 +481,34 @@ Trả về MỘT block JSON duy nhất. KHÔNG comment, KHÔNG giải thích bê
 • Object nesting tối đa 3 cấp
 • Mỗi field phải có ý nghĩa gameplay, KHÔNG thêm field thừa
 `;
+
+export const MVUZOD_OUTPUT_FORMAT_PROMPT = `
+Bạn là AI chuyên gia thiết lập framework MVU ZOD cho SillyTavern.
+Nhiệm vụ: Tạo nội dung cho worldbook entry "Định dạng đầu ra biến" dựa trên Schema của người dùng.
+
+YÊU CẦU ĐẦU RA (ĐỊNH DẠNG CHÍNH XÁC):
+Định dạng đầu ra biến:
+  rule:
+    - Output update analysis + commands ở CUỐI mỗi reply
+    - Format: JSON Patch (RFC 6902), JSON array chứa operation objects
+    - Operations hỗ trợ: replace, delta, insert, remove, move
+    - KHÔNG update fields bắt đầu bằng _ (readonly)
+  format: |-
+    <UpdateVariable>
+    <Analysis>$(Tiếng Anh, tối đa 80 từ)
+    - \${tính thời gian trôi qua: ...}
+    - \${phán đoán: ...}
+    ... (Thêm các hướng dẫn tư duy Analysis cụ thể cho các biến quan trọng trong Schema)
+    </Analysis>
+    <JSONPatch>
+    [
+      { "op": "replace", "path": "\${/đường/dẫn}", "value": "\${giá trị mới}" },
+      ... (Thêm các mẫu JSON Patch cụ thể phù hợp với Schema)
+    ]
+    </JSONPatch>
+    </UpdateVariable>
+
+Hãy phân tích Schema được cung cấp, sau đó trả về ĐÚNG cấu trúc YAML trên. 
+KHÔNG trả về markdown code block. CHỈ trả về đoạn text YAML thuần tuý.
+Hãy điền các hướng dẫn \${...} trong <Analysis> và các ví dụ JSONPatch trong <JSONPatch> sao cho sát với các biến thực tế có trong Schema.
+`;

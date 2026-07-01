@@ -114,9 +114,9 @@ Workflow 5 bước:
 3. Tạo TavernHelper scripts (registerMvuSchema từ jsdelivr)
 4. Tạo system entries:
    - [initvar]初始化 (DISABLED worldbook entry, YAML format)
-   - 变量列表 (D0/D1, dùng {{format_message_variable::stat_data}})
-   - [mvu_update]変量更新規則 (check field cho từng biến)
-   - [mvu_update]変量出力格式 (<Analysis> CoT + <JSONPatch>)
+   - Danh sách biến (D0/D1, dùng {{format_message_variable::stat_data}})
+   - [mvu_update]Quy tắc cập nhật biến (check field cho từng biến)
+   - [mvu_update]Định dạng đầu ra biến (<Analysis> CoT + <JSONPatch>)
 5. Test runtime format
 
 Kỹ thuật Schema từ repo tham khảo:
@@ -186,10 +186,10 @@ Card này dùng hệ thống MVUZOD. Khi tạo entries mới:
 // ═══════════════════════════════════════════════════════════════════════════
 
 const VARIABLE_UPDATE_FORMAT = `=== BIẾN UPDATE FORMAT (JSON Patch + Analysis CoT) ===
-Khi tạo entry [mvu_update]変量出力格式, dùng template sau:
+Khi tạo entry [mvu_update]Định dạng đầu ra biến, dùng template sau:
 
 ---
-変量出力格式:
+Định dạng đầu ra biến:
   rule:
     - Output update analysis + commands ở CUỐI mỗi reply
     - Format: JSON Patch (RFC 6902), JSON array chứa operation objects
@@ -237,9 +237,9 @@ Ví dụ AI output:
 // ═══════════════════════════════════════════════════════════════════════════
 
 const UPDATE_RULES_TEMPLATE = `=== TEMPLATE TẠO UPDATE RULES ===
-Khi tạo entry [mvu_update]変量更新規則, dùng format sau cho từng biến:
+Khi tạo entry [mvu_update]Quy tắc cập nhật biến, dùng format sau cho từng biến:
 
-変量更新規則:
+Quy tắc cập nhật biến:
   [Group]:
     [FieldName]:
       type: number | string | TypeScript interface

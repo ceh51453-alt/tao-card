@@ -327,7 +327,7 @@ function ModeInfoBanner({ mode }: { mode: 'worldbook' | 'per_opening' }) {
       <div className="rounded-lg bg-blue-500/5 border border-blue-500/20 p-3 space-y-1">
         <p className="text-xs text-blue-400 font-medium">📚 Chế độ: Worldbook Entry (mặc định)</p>
         <ul className="text-[10px] text-blue-400/70 space-y-0.5">
-          <li>• Tạo 1 entry <code>[initvar]変量初始化勿開</code> trong worldbook</li>
+          <li>• Tạo 1 entry <code>[initvar]Khởi tạo biến (Tắt)</code> trong worldbook</li>
           <li>• Entry này <strong>PHẢI DISABLED</strong> — MVU chỉ đọc entry disabled</li>
           <li>• Tất cả openings sẽ dùng chung bộ giá trị này</li>
           <li>• Phù hợp khi chỉ có 1 route hoặc tất cả route cùng giá trị ban đầu</li>
@@ -499,7 +499,7 @@ export function InitVarEditor({ schema }: { schema: MVUZODSchema | null }) {
   const yamlPreview = useMemo(() => {
     const defaultEntry = config.entries.find(e => e.isDefault);
     if (!defaultEntry) return '# Chưa có initvar nào. Nhấn "Thêm biến khởi tạo" để bắt đầu.';
-    return `# [InitVar] ${defaultEntry.label}\n# Được tạo bởi Tavern Card Studio\n# Entry: [initvar]変量初始化勿開 (DISABLED)\n\n${generateWorldbookYAML(defaultEntry.data)}`;
+    return `# [InitVar] ${defaultEntry.label}\n# Được tạo bởi Tavern Card Studio\n# Entry: [initvar]Khởi tạo biến (Tắt) (DISABLED)\n\n${generateWorldbookYAML(defaultEntry.data)}`;
   }, [config.entries]);
 
   const lorebookContent = useMemo(() => {
@@ -633,7 +633,7 @@ export function InitVarEditor({ schema }: { schema: MVUZODSchema | null }) {
           <div className="flex items-center justify-between">
             <h4 className="text-xs font-semibold flex items-center gap-1.5">
               <FileText className="w-3.5 h-3.5 text-primary" />
-              Preview: Worldbook Entry <code className="text-primary text-[10px]">[initvar]変量初始化勿開</code>
+              Preview: Worldbook Entry <code className="text-primary text-[10px]">[initvar]Khởi tạo biến (Tắt)</code>
             </h4>
             <div className="flex gap-1.5">
               <button

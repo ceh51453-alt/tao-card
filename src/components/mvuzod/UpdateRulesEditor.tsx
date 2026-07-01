@@ -1,7 +1,7 @@
 /**
  * UpdateRulesEditor — Auto-generate [mvu_update] worldbook entries from schema
- * References: MVU_ZOD指南.md "第五步：编写变量提示词" + "変量更新規則"
- * Generates both 変量更新規則 and 変量出力格式 entries
+ * References: MVU_ZOD指南.md "第五步：编写变量提示词" + "Quy tắc cập nhật biến"
+ * Generates both Quy tắc cập nhật biến and Định dạng đầu ra biến entries
  */
 
 import { useState, useMemo, useCallback } from 'react';
@@ -14,7 +14,7 @@ import { useCardStore } from '../../store/cardStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { callAI } from '../../lib/ai/client';
 import type { ChatMessage } from '../../types';
-import { MVUZOD_UPDATE_RULES_PROMPT } from '../../prompts/modeMVUZOD';
+import { MVUZOD_UPDATE_RULES_PROMPT, MVUZOD_OUTPUT_FORMAT_PROMPT } from '../../prompts/modeMVUZOD';
 import { parseSchemaInferenceResponse } from '../../lib/mvuzod/schemaInferencer';
 import { nextEntryId } from '../../lib/converters/cardDefaults';
 import type { LorebookEntry } from '../../types/lorebook.types';
@@ -22,7 +22,7 @@ import type { LorebookEntry } from '../../types/lorebook.types';
 // ─── YAML Generator ──────────────────────────────────────────────────────
 
 function generateUpdateRulesYAML(schema: MVUZODSchema): string {
-  const lines: string[] = ['変量更新規則:'];
+  const lines: string[] = ['Quy tắc cập nhật biến:'];
 
   function processField(field: MVUZODField, indent: number, parentPath: string) {
     const name = field.path.split('/').filter(Boolean).pop() ?? field.path;
@@ -125,7 +125,7 @@ function generateAutoCheck(field: MVUZODField, name: string): string[] {
 // ─── Output Format Generator ─────────────────────────────────────────────
 
 function generateOutputFormatYAML(): string {
-  return `変量出力格式:
+  return `Định dạng đầu ra biến:
   rule:
     - Output update analysis + commands ở CUỐI mỗi reply
     - Format: JSON Patch (RFC 6902), JSON array chứa operation objects
@@ -185,20 +185,20 @@ const ENTRY_CONFIGS: Record<'rules' | 'format' | 'varlist', {
   role?: number | null;
 }> = {
   rules: {
-    comment: '[mvu_update]変量更新規則',
+    comment: '[mvu_update]Quy tắc cập nhật biến',
     constant: true,
     positionExt: 0,
     depth: 4,
   },
   format: {
-    comment: '[mvu_update]変量出力格式',
+    comment: '[mvu_update]Định dạng đầu ra biến',
     constant: true,
     positionExt: 4,
     depth: 0,
     role: 1,
   },
   varlist: {
-    comment: '変量列表',
+    comment: 'Danh sách biến',
     constant: true,
     positionExt: 0,
     depth: 1,
@@ -212,13 +212,14 @@ export function UpdateRulesEditor({ schema }: {
 }) {
   const [activeTab, setActiveTab] = useState<'rules' | 'format' | 'varlist'>('rules');
   const [copied, setCopied] = useState<string | null>(null);
+  const [customFormatYAML, setCustomFormatYAML] = useState<string | null>(null);
 
   const rulesYAML = useMemo(() =>
     schema ? generateUpdateRulesYAML(schema) : '(Chưa có schema)',
     [schema]
   );
 
-  const formatYAML = useMemo(() => generateOutputFormatYAML(), []);
+  const formatYAML = useMemo(() => customFormatYAML || generateOutputFormatYAML(), [customFormatYAML]);
 
   const varListYAML = useMemo(() =>
     schema ? generateVariableListYAML(schema) : '(Chưa có schema)',
@@ -287,11 +288,11 @@ export function UpdateRulesEditor({ schema }: {
 
   const tabs = [
     { id: 'rules' as const, label: 'Update Rules', icon: FileText, yaml: rulesYAML,
-      entryName: '[mvu_update]変量更新規則', description: 'Hướng dẫn AI khi nào và cách nào update biến' },
+      entryName: '[mvu_update]Quy tắc cập nhật biến', description: 'Hướng dẫn AI khi nào và cách nào update biến' },
     { id: 'format' as const, label: 'Output Format', icon: Sparkles, yaml: formatYAML,
-      entryName: '[mvu_update]変量出力格式', description: 'Template <Analysis> CoT + <JSONPatch>' },
+      entryName: '[mvu_update]Định dạng đầu ra biến', description: 'Template <Analysis> CoT + <JSONPatch>' },
     { id: 'varlist' as const, label: 'Variable List', icon: Eye, yaml: varListYAML,
-      entryName: '変量列表', description: 'Macro hiển thị giá trị biến cho AI đọc' },
+      entryName: 'Danh sách biến', description: 'Macro hiển thị giá trị biến cho AI đọc' },
   ];
 
   const activeTabData = tabs.find(t => t.id === activeTab)!;
@@ -357,6 +358,7 @@ export function UpdateRulesEditor({ schema }: {
             <Download className="w-3 h-3" /> Inject vào card
           </button>
           {activeTab === 'rules' && <AIUpdateRulesButton schema={schema} />}
+          {activeTab === 'format' && <AIOutputFormatButton schema={schema} setCustomFormatYAML={setCustomFormatYAML} />}
         </div>
       </div>
 
@@ -390,7 +392,7 @@ export function UpdateRulesEditor({ schema }: {
         <p className="text-[10px] font-medium text-muted-foreground mb-1">💡 Hướng dẫn sử dụng</p>
         {activeTab === 'rules' && (
           <ul className="text-[10px] text-muted-foreground space-y-0.5">
-            <li>• Copy nội dung → Paste vào worldbook entry <code>[mvu_update]変量更新規則</code></li>
+            <li>• Copy nội dung → Paste vào worldbook entry <code>[mvu_update]Quy tắc cập nhật biến</code></li>
             <li>• Mỗi biến cần <code>check</code> rules cụ thể — edit trong Schema Editor (tab ℹ️)</li>
             <li>• Biến <code>_</code> readonly tự động bị bỏ qua</li>
             <li>• Gộp biến cùng nhóm: <code>着装.$&#123;上装|下装|...&#125;</code></li>
@@ -507,5 +509,68 @@ function applyRulesToFields(
       applyRulesToFields(field.children, rules);
     }
   }
+}
+
+// ─── AI Output Format Generator ──────────────────────────────────────────
+
+function AIOutputFormatButton({ schema, setCustomFormatYAML }: { schema: MVUZODSchema, setCustomFormatYAML: (yaml: string) => void }) {
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const handleGenerate = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    setStatus('Đang kết nối AI...');
+    try {
+      const activeProfile = useSettingsStore.getState().getActiveProfile();
+      const params = useSettingsStore.getState().generationParams;
+      if (!activeProfile?.apiKey) throw new Error('Chưa cấu hình API AI.');
+
+      const schemaDesc = JSON.stringify(schema, null, 2);
+
+      const messages: ChatMessage[] = [
+        { role: 'system', content: MVUZOD_OUTPUT_FORMAT_PROMPT },
+        { role: 'user', content: `SCHEMA:\n${schemaDesc}\n\nHãy sinh định dạng đầu ra biến (Output Format).` },
+      ];
+
+      const response = await callAI({
+        profile: activeProfile,
+        params: { ...params, useJsonResponseFormat: false },
+        messages,
+      });
+
+      setStatus('Đang xử lý kết quả...');
+      let result = response.text.trim();
+      if (result.startsWith('```yaml')) {
+         result = result.replace(/^```yaml\n/, '').replace(/\n```$/, '');
+      } else if (result.startsWith('```')) {
+         result = result.replace(/^```\n/, '').replace(/\n```$/, '');
+      }
+      
+      setCustomFormatYAML(result);
+      setStatus('✅ Đã tạo Định dạng đầu ra!');
+      setTimeout(() => setStatus(''), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setStatus('');
+    } finally {
+      setLoading(false);
+    }
+  }, [schema, setCustomFormatYAML]);
+
+  return (
+    <div className="flex items-center gap-2">
+      <button onClick={handleGenerate} disabled={loading}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-violet-500/80 to-primary/80
+          text-white text-xs font-medium hover:from-violet-500 hover:to-primary transition-all
+          disabled:opacity-50 disabled:cursor-wait">
+        {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+        {loading ? 'AI đang tạo...' : 'AI tạo Output Format'}
+      </button>
+      {status && <span className="text-[10px] text-muted-foreground">{status}</span>}
+      {error && <span className="text-[10px] text-red-400 max-w-xs truncate" title={error}>{error}</span>}
+    </div>
+  );
 }
 

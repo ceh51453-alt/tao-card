@@ -1565,7 +1565,7 @@ $(() => {
 
       <div className="rounded-lg bg-muted/20 border border-border p-3 space-y-1">
         <p className="text-[10px] text-muted-foreground">
-          <strong>Cách dùng:</strong> Copy code này vào <strong>酒馆助手脚本库 → 角色脚本</strong>, đặt tên &quot;变量结构&quot;.
+          <strong>Cách dùng:</strong> Copy code này vào <strong>酒馆助手脚本库 → 角色脚本</strong>, đặt tên &quot;Cấu trúc biến&quot;.
         </p>
         <p className="text-[10px] text-muted-foreground">
           <code>z</code> (Zod 4) và <code>_</code> (Lodash) đã global — <strong>không cần import</strong>.

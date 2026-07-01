@@ -4,8 +4,8 @@
  *
  * 1. Schema Script (registerMvuSchema) — complete JS for 酒馆助手 角色脚本
  * 2. InitVar YAML — [initvar] worldbook entry content
- * 3. Variable List Entry — 変量列表 worldbook entry with macros
- * 4. Update Rules Entry — [mvu_update] 変量更新規則
+ * 3. Variable List Entry — Danh sách biến worldbook entry with macros
+ * 4. Update Rules Entry — [mvu_update] Quy tắc cập nhật biến
  * 5. Regex Patterns — hide <UpdateVariable> blocks from chat display
  *
  * References:
@@ -300,7 +300,7 @@ function objectToYAML(obj: unknown, indent: number): string {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 3. VARIABLE LIST ENTRY GENERATOR — 変量列表 worldbook entry
+// 3. VARIABLE LIST ENTRY GENERATOR — Danh sách biến worldbook entry
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
@@ -348,7 +348,7 @@ export function generateVariableListEntry(
  */
 export function getVariableListEntryConfig() {
   return {
-    comment: '変量列表',
+    comment: 'Danh sách biến',
     position: 'at_depth_system' as const,
     depth: 0,
     order: 200,
@@ -359,7 +359,7 @@ export function getVariableListEntryConfig() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 4. UPDATE RULES ENTRY GENERATOR — [mvu_update] 変量更新規則
+// 4. UPDATE RULES ENTRY GENERATOR — [mvu_update] Quy tắc cập nhật biến
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
@@ -367,7 +367,7 @@ export function getVariableListEntryConfig() {
  * Follows pattern from MVU_ZOD指南.md "第六步：配置酒馆正则" section.
  */
 export function generateUpdateRulesEntry(schema: MVUZODSchema): string {
-  const lines: string[] = ['---', '変量更新規則:'];
+  const lines: string[] = ['---', 'Quy tắc cập nhật biến:'];
 
   for (const field of schema.fields) {
     processUpdateRuleField(field, 1, lines);
@@ -593,8 +593,11 @@ function getFieldName(field: MVUZODField): string {
   return field.path.split('/').filter(Boolean).pop() ?? field.path;
 }
 
-function escapeQuotes(s: string): string {
-  return s.replace(/'/g, "\\'");
+function escapeQuotes(s: unknown): string {
+  if (typeof s !== 'string') {
+    s = typeof s === 'object' ? JSON.stringify(s) : String(s);
+  }
+  return (s as string).replace(/'/g, "\\'");
 }
 
 function getDefaultForType(type: string): unknown {

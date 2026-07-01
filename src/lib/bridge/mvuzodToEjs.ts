@@ -208,7 +208,7 @@ export function generateVariableDisplay(
     code: lines.join('\n'),
     fieldPaths: filtered.map(f => f.path),
     entryConfig: {
-      comment: `変量列表 (EJS Display)`,
+      comment: `Danh sách biến (EJS Display)`,
       constant: true,
       position: 'before_char',
       depth: 1,

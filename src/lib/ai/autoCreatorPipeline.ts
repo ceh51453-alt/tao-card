@@ -440,7 +440,7 @@ function applyParsedDataToCard(
 
         if (config.stepConfigs.mvuzod.createUpdateRules && result.updateRulesEntry) {
           entries.push(materializeEntry({
-            comment: '[mvu_update]変量更新規則',
+            comment: '[mvu_update]Quy tắc cập nhật biến',
             keys: [''],
             content: result.updateRulesEntry as string,
             constant: true,
@@ -449,7 +449,7 @@ function applyParsedDataToCard(
 
         if (config.stepConfigs.mvuzod.createVarList && result.varListEntry) {
           entries.push(materializeEntry({
-            comment: '变量列表',
+            comment: 'Danh sách biến',
             keys: [''],
             content: result.varListEntry as string,
             constant: true,

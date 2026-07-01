@@ -39,7 +39,7 @@ const PANELS: OutputPanel[] = [
     id: 'schema',
     label: 'Schema Script',
     icon: FileCode,
-    description: '变量结构脚本 — Đăng ký Zod schema cho MVU framework',
+    description: 'Kịch bản cấu trúc biến — Đăng ký Zod schema cho MVU framework',
     worldbookInfo: undefined, // This goes to Tavern Helper Scripts, not worldbook
     color: 'violet',
   },
@@ -61,9 +61,9 @@ const PANELS: OutputPanel[] = [
     id: 'varlist',
     label: 'Biến số (Variable List)',
     icon: ListTree,
-    description: '変量列表 — Hiển thị biến hiện tại cho AI đọc',
+    description: 'Danh sách biến — Hiển thị biến hiện tại cho AI đọc',
     worldbookInfo: {
-      entryName: '変量列表',
+      entryName: 'Danh sách biến',
       position: 'D0 hoặc D1 (at_depth_system)',
       order: 200,
       constant: true,
@@ -396,7 +396,7 @@ function UsageGuide({ activePanel }: { activePanel: string }) {
     varlist: {
       title: '📌 Hướng dẫn: Variable List',
       steps: [
-        'Tạo worldbook entry "変量列表" (KHÔNG thêm [mvu_update] prefix)',
+        'Tạo worldbook entry "Danh sách biến" (KHÔNG thêm [mvu_update] prefix)',
         'Paste content trên vào → Entry luôn BẬT (constant)',
         'Đặt vị trí: D0 hoặc D1 (at_depth_system) | Order: 200',
         'Macro {{format_message_variable::stat_data}} tự thay bằng giá trị biến hiện tại',

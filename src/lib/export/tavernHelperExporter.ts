@@ -200,7 +200,7 @@ function generateInitVarFile(schema: MVUZODSchema): string {
     `export const INITIAL_STATE = ${JSON.stringify(defaults, null, 2)};`,
     '',
     '// To use in worldbook entry:',
-    '// Comment: [InitVar]初始变量',
+    '// Comment: [InitVar]Khởi tạo biến',
     '// Content: The JSON above',
     '// Settings: constant=true, position=before_char, scan_depth=0',
   ].join('\n');

@@ -1119,9 +1119,45 @@ export function parseSchemaInferenceResponse(raw: string): {
   if (fenceMatch) cleaned = fenceMatch[1].trim();
 
   const firstBrace = cleaned.indexOf('{');
-  const lastBrace = cleaned.lastIndexOf('}');
-  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-    cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+  if (firstBrace !== -1) {
+    let openBraces = 0;
+    let inString = false;
+    let escape = false;
+    let validEndIndex = -1;
+    
+    for (let i = firstBrace; i < cleaned.length; i++) {
+      const ch = cleaned[i];
+      if (inString) {
+        if (escape) {
+          escape = false;
+        } else if (ch === '\\') {
+          escape = true;
+        } else if (ch === '"') {
+          inString = false;
+        }
+      } else {
+        if (ch === '"') {
+          inString = true;
+        } else if (ch === '{') {
+          openBraces++;
+        } else if (ch === '}') {
+          openBraces--;
+          if (openBraces === 0) {
+            validEndIndex = i;
+            break;
+          }
+        }
+      }
+    }
+    
+    if (validEndIndex !== -1) {
+      cleaned = cleaned.substring(firstBrace, validEndIndex + 1);
+    } else {
+      const lastBrace = cleaned.lastIndexOf('}');
+      if (lastBrace > firstBrace) {
+        cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+      }
+    }
   }
 
   cleaned = cleaned

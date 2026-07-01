@@ -3,7 +3,7 @@
  *
  * Creates the 5 system worldbook entries needed for MVU ZOD framework:
  * 1. [initvar] — Initial variable values (disabled entry)
- * 2. 変量列表 — Variable list display for AI
+ * 2. Danh sách biến — Variable list display for AI
  * 3. [mvu_update] Update Rules — How AI should update variables
  * 4. [mvu_update] Output Format — JSON Patch format spec
  * 5. [mvu_update] Emphasis — D0 reminder for AI
@@ -67,7 +67,7 @@ export interface WorldbookGeneratorResult {
 /** Canonical comment patterns for identifying existing system entries */
 const SYSTEM_ENTRY_PATTERNS: Record<string, RegExp> = {
   initvar: /\[initvar\]|初始化变量|khởi tạo biến/i,
-  varlist: /変量列表|variable.?list|biến số/i,
+  varlist: /Danh sách biến|variable.?list|biến số/i,
   update_rules: /\[mvu_update\].*(?:quy tắc|rules|更新規則)/i,
   output_format: /\[mvu_update\].*(?:định dạng|format|格式)/i,
   emphasis: /\[mvu_update\].*(?:nhấn mạnh|emphasis|強調)/i,
@@ -89,7 +89,7 @@ function buildSystemEntrySpecs(schema: MVUZODSchema): GeneratedSystemEntry[] {
     },
     {
       systemId: 'varlist',
-      comment: '変量列表',
+      comment: 'Danh sách biến',
       content: generateVariableListEntry(schema, 'full'),
       constant: true,
       enabled: true,
